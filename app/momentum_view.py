@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from data.ingest import DRIVERS
+from agent.granite import annotate_shift, race_narrative, driver_of_race
 
 TEAM_COLORS = {
     "Red Bull": "#3671C6",
@@ -67,14 +68,12 @@ def _derive_flag_periods(race_slug: str, df: pd.DataFrame) -> list:
 
 @st.cache_data(show_spinner=False)
 def _get_shift_annotation(shift_json: str, mode: str) -> str:
-    from agent.granite import annotate_shift
     shift = json.loads(shift_json)
     return annotate_shift(shift, mode)
 
 
 @st.cache_data(show_spinner=False)
 def _get_race_narrative(race_slug: str, shifts_json: str, flags_json: str, positions_json: str, race_name: str, mode: str) -> str:
-    from agent.granite import race_narrative
     shifts = json.loads(shifts_json)
     flags = json.loads(flags_json)
     positions = json.loads(positions_json)
@@ -83,7 +82,6 @@ def _get_race_narrative(race_slug: str, shifts_json: str, flags_json: str, posit
 
 @st.cache_data(show_spinner=False)
 def _get_driver_of_race(race_slug: str, driver: str, stats_json: str, mode: str) -> str:
-    from agent.granite import driver_of_race
     stats = json.loads(stats_json)
     return driver_of_race(driver, stats, mode)
 

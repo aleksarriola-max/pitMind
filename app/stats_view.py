@@ -6,6 +6,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data.ingest import DRIVERS
+from agent.granite import h2h_narrative
+from models.driver_stats import compute_season_stats, season_arc, rank_drivers
 
 DRIVER_COLORS = {
     "VER": "#3671C6", "HAM": "#E8002D", "LEC": "#E8002D",
@@ -39,7 +41,6 @@ RADAR_LABELS = [
 
 
 def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
-    from models.driver_stats import compute_season_stats, season_arc, rank_drivers
     st.subheader("Driver Statistics — 2025 Season")
 
     stats_df = compute_season_stats(all_race_dfs)
@@ -145,7 +146,6 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
         st.plotly_chart(fig_radar, use_container_width=True)
 
         # Granite H2H narrative
-        from agent.granite import h2h_narrative
         stats_a = {k: stats_df.loc[driver_a, k] for k in LEADERBOARD_METRICS if k in stats_df.columns and driver_a in stats_df.index}
         stats_b = {k: stats_df.loc[driver_b, k] for k in LEADERBOARD_METRICS if k in stats_df.columns and driver_b in stats_df.index}
         narrative = h2h_narrative(driver_a, driver_b,

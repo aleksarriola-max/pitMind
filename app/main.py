@@ -69,11 +69,14 @@ with st.sidebar:
     st.divider()
 
     race_labels = {slug: info["name"] for slug, info in RACES.items()}
+    _race_keys = list(race_labels.keys())
+    if st.session_state.selected_race not in race_labels:
+        st.session_state.selected_race = _race_keys[0]
     race_slug = st.selectbox(
         "Race",
-        options=list(race_labels.keys()),
+        options=_race_keys,
         format_func=lambda s: race_labels[s],
-        index=list(race_labels.keys()).index(st.session_state.selected_race),
+        index=_race_keys.index(st.session_state.selected_race),
         key="race_selector",
     )
     if race_slug != st.session_state.selected_race:

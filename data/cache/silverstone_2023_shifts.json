@@ -1,0 +1,164 @@
+[
+  {
+    "lap": 28,
+    "driver": "SAI",
+    "team": "Ferrari",
+    "magnitude": 10.0,
+    "direction": "up",
+    "momentum_before": 60.3,
+    "momentum_after": 70.2
+  },
+  {
+    "lap": 30,
+    "driver": "HAM",
+    "team": "Mercedes",
+    "magnitude": 11.6,
+    "direction": "down",
+    "momentum_before": 65.2,
+    "momentum_after": 53.6
+  },
+  {
+    "lap": 33,
+    "driver": "LEC",
+    "team": "Ferrari",
+    "magnitude": 39.6,
+    "direction": "down",
+    "momentum_before": 69.2,
+    "momentum_after": 29.6
+  },
+  {
+    "lap": 33,
+    "driver": "SAI",
+    "team": "Ferrari",
+    "magnitude": 33.8,
+    "direction": "down",
+    "momentum_before": 67.6,
+    "momentum_after": 33.8
+  },
+  {
+    "lap": 33,
+    "driver": "ALO",
+    "team": "Aston Martin",
+    "magnitude": 30.4,
+    "direction": "down",
+    "momentum_before": 62.8,
+    "momentum_after": 32.5
+  },
+  {
+    "lap": 34,
+    "driver": "RUS",
+    "team": "Mercedes",
+    "magnitude": 33.6,
+    "direction": "down",
+    "momentum_before": 63.0,
+    "momentum_after": 29.4
+  },
+  {
+    "lap": 34,
+    "driver": "PER",
+    "team": "Red Bull Racing",
+    "magnitude": 32.2,
+    "direction": "down",
+    "momentum_before": 63.9,
+    "momentum_after": 31.7
+  },
+  {
+    "lap": 35,
+    "driver": "NOR",
+    "team": "McLaren",
+    "magnitude": 35.2,
+    "direction": "down",
+    "momentum_before": 60.9,
+    "momentum_after": 25.7
+  },
+  {
+    "lap": 35,
+    "driver": "HAM",
+    "team": "Mercedes",
+    "magnitude": 33.8,
+    "direction": "down",
+    "momentum_before": 59.9,
+    "momentum_after": 26.1
+  },
+  {
+    "lap": 35,
+    "driver": "VER",
+    "team": "Red Bull Racing",
+    "magnitude": 32.5,
+    "direction": "down",
+    "momentum_before": 57.3,
+    "momentum_after": 24.7
+  },
+  {
+    "lap": 39,
+    "driver": "VER",
+    "team": "Red Bull Racing",
+    "magnitude": 40.7,
+    "direction": "up",
+    "momentum_before": 24.7,
+    "momentum_after": 65.4
+  },
+  {
+    "lap": 39,
+    "driver": "NOR",
+    "team": "McLaren",
+    "magnitude": 39.6,
+    "direction": "up",
+    "momentum_before": 25.7,
+    "momentum_after": 65.3
+  },
+  {
+    "lap": 39,
+    "driver": "HAM",
+    "team": "Mercedes",
+    "magnitude": 38.5,
+    "direction": "up",
+    "momentum_before": 26.1,
+    "momentum_after": 64.6
+  },
+  {
+    "lap": 39,
+    "driver": "RUS",
+    "team": "Mercedes",
+    "magnitude": 38.0,
+    "direction": "up",
+    "momentum_before": 26.7,
+    "momentum_after": 64.7
+  },
+  {
+    "lap": 39,
+    "driver": "ALO",
+    "team": "Aston Martin",
+    "magnitude": 37.3,
+    "direction": "up",
+    "momentum_before": 27.1,
+    "momentum_after": 64.3
+  },
+  {
+    "lap": 39,
+    "driver": "SAI",
+    "team": "Ferrari",
+    "magnitude": 36.8,
+    "direction": "up",
+    "momentum_before": 27.6,
+    "momentum_after": 64.4
+  },
+  {
+    "lap": 39,
+    "driver": "LEC",
+    "team": "Ferrari",
+    "magnitude": 36.2,
+    "direction": "up",
+    "momentum_before": 28.6,
+    "momentum_after": 64.8
+  },
+  {
+    "lap": 39,
+    "driver": "PER",
+    "team": "Red Bull Racing",
+    "magnitude": 36.0,
+    "direction": "up",
+    "momentum_before": 27.5,
+    "momentum_after": 63.5
+  }
+]

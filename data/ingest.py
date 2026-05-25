@@ -29,6 +29,7 @@ RACES = {
 
 DRIVERS = ["VER", "HAM", "LEC", "SAI", "ALO", "PER", "NOR", "RUS"]
 
+os.makedirs(FASTF1_CACHE_DIR, exist_ok=True)
 fastf1.Cache.enable_cache(FASTF1_CACHE_DIR)
 
 

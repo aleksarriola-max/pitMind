@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-from data.ingest import DRIVERS, load_flags
+from data.ingest import DRIVERS
 
 TEAM_COLORS = {
     "Red Bull": "#3671C6",
@@ -99,6 +99,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
     st.caption(f"{race_name} · Momentum score per car per lap (0–100)")
 
     # Load flag periods
+    from data.ingest import load_flags
     flag_periods = load_flags(race_slug, df)
 
     # Driver filter

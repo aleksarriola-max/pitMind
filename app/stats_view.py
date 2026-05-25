@@ -1,0 +1,226 @@
+"""Driver Statistics Tab — season leaderboard, H2H radar, season arc."""
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
+from data.ingest import DRIVERS
+from models.driver_stats import compute_season_stats, season_arc, rank_drivers
+
+DRIVER_COLORS = {
+    "VER": "#3671C6", "HAM": "#E8002D", "LEC": "#E8002D",
+    "SAI": "#64C4FF", "ALO": "#229971", "PER": "#3671C6",
+    "NOR": "#FF8000", "RUS": "#27F4D2",
+}
+
+LEADERBOARD_METRICS = {
+    "avg_finish":          ("Avg Finish", True),   # (label, lower_is_better)
+    "avg_grid":            ("Avg Grid",   True),
+    "avg_positions_gained":("Pos Gained", False),
+    "avg_pace_delta":      ("Pace Δ (s)", True),
+    "tyre_preservation":   ("Tyre Save",  False),
+    "aggression_level":    ("Aggression", False),
+    "overtake_tendency":   ("Overtakes",  False),
+    "pressure_consistency":("Consistency",False),
+    "pit_compliance":      ("Pit Comply", False),
+}
+
+RADAR_METRICS = [
+    "tyre_preservation", "aggression_level", "overtake_tendency",
+    "pressure_consistency", "restart_aggression", "dirty_air_tolerance",
+    "pit_compliance", "late_braking_tendency",
+]
+
+RADAR_LABELS = [
+    "Tyre Save", "Aggression", "Overtakes",
+    "Consistency", "SC Restart", "Dirty Air",
+    "Pit Comply", "Late Brake",
+]
+
+
+def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
+    st.subheader("Driver Statistics — 2025 Season")
+
+    stats_df = compute_season_stats(all_race_dfs)
+    if len(stats_df) == 0:
+        st.info("Not enough race data to compute season statistics.")
+        return
+
+    stats_df = rank_drivers(stats_df)
+    mode_label = "Fan" if mode == "fan" else "Engineer"
+
+    # ── Section 1: Leaderboard ─────────────────────────────────────────────────
+    st.markdown("### Driver Leaderboard")
+    st.caption("Click any column header to sort · Green = top 3 · Red = bottom 3")
+
+    display_cols = {}
+    for col, (label, lower_better) in LEADERBOARD_METRICS.items():
+        if col in stats_df.columns:
+            display_cols[col] = label
+
+    if display_cols:
+        leaderboard = stats_df[list(display_cols.keys())].copy()
+        leaderboard.columns = list(display_cols.values())
+        leaderboard = leaderboard.reset_index()
+        leaderboard.insert(0, "#", range(1, len(leaderboard) + 1))
+
+        # Color rows: format numeric to 1 decimal
+        def style_leaderboard(df):
+            styles = pd.DataFrame("", index=df.index, columns=df.columns)
+            for col_name in df.columns:
+                if col_name in ("#", "driver"):
+                    continue
+                vals = pd.to_numeric(df[col_name], errors="coerce")
+                lower_better_flag = LEADERBOARD_METRICS.get(
+                    [k for k, v in display_cols.items() if v == col_name] [0]
+                    if [k for k, v in display_cols.items() if v == col_name] else "", (col_name, False)
+                )[1]
+                ranked = vals.rank(ascending=lower_better_flag, na_option="bottom")
+                for i in ranked.index:
+                    r = ranked[i]
+                    if r <= 3:
+                        styles.at[i, col_name] = "color: #27F4D2; font-weight: bold"
+                    elif r >= len(vals) - 1:
+                        styles.at[i, col_name] = "color: #EF4444"
+            return styles
+
+        st.dataframe(
+            leaderboard.style.apply(style_leaderboard, axis=None).format(
+                {col: "{:.1f}" for col in leaderboard.columns if col not in ("#", "driver")}
+            ),
+            use_container_width=True,
+            height=320,
+        )
+
+    st.divider()
+
+    # ── Section 2: H2H Comparison ──────────────────────────────────────────────
+    st.markdown("### Head-to-Head Comparison")
+
+    available = [d for d in DRIVERS if d in stats_df.index]
+    col_a, col_b = st.columns(2)
+    driver_a = col_a.selectbox("Driver A", options=available,
+                               index=0, key="h2h_a")
+    driver_b = col_b.selectbox("Driver B", options=available,
+                               index=min(1, len(available) - 1), key="h2h_b")
+
+    if driver_a != driver_b:
+        radar_vals = []
+        for drv, col_key in [(driver_a, "a"), (driver_b, "b")]:
+            vals = []
+            for metric in RADAR_METRICS:
+                if metric in stats_df.columns and drv in stats_df.index:
+                    v = stats_df.loc[drv, metric]
+                    vals.append(float(v) if pd.notna(v) else 50.0)
+                else:
+                    vals.append(50.0)
+            radar_vals.append(vals)
+
+        fig_radar = go.Figure()
+        for drv, vals, color in [(driver_a, radar_vals[0], DRIVER_COLORS.get(driver_a, "#AAAAAA")),
+                                  (driver_b, radar_vals[1], DRIVER_COLORS.get(driver_b, "#FFFFFF"))]:
+            fig_radar.add_trace(go.Scatterpolar(
+                r=vals + [vals[0]],
+                theta=RADAR_LABELS + [RADAR_LABELS[0]],
+                fill="toself",
+                name=drv,
+                line=dict(color=color),
+                fillcolor=color.replace(")", ",0.15)").replace("rgb", "rgba") if color.startswith("rgb") else color + "26",
+                opacity=0.85,
+            ))
+
+        fig_radar.update_layout(
+            polar=dict(
+                bgcolor="#1C1C1C",
+                radialaxis=dict(visible=True, range=[0, 100], gridcolor="#333", tickfont=dict(color="#888")),
+                angularaxis=dict(gridcolor="#333", tickfont=dict(color="white")),
+            ),
+            paper_bgcolor="#0F0F0F",
+            font=dict(color="white"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.05),
+            height=380,
+            margin=dict(l=50, r=50, t=20, b=20),
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)
+
+        # Granite H2H narrative
+        from agent.granite import h2h_narrative
+        stats_a = {k: stats_df.loc[driver_a, k] for k in LEADERBOARD_METRICS if k in stats_df.columns and driver_a in stats_df.index}
+        stats_b = {k: stats_df.loc[driver_b, k] for k in LEADERBOARD_METRICS if k in stats_df.columns and driver_b in stats_df.index}
+        narrative = h2h_narrative(driver_a, driver_b,
+                                  {k: (float(v) if pd.notna(v) else None) for k, v in stats_a.items()},
+                                  {k: (float(v) if pd.notna(v) else None) for k, v in stats_b.items()},
+                                  mode)
+        st.info(f"**{mode_label} H2H:** {narrative}")
+
+        # Win/loss table per metric
+        st.markdown("**Metric-by-metric breakdown:**")
+        rows = []
+        for col, (label, lower_better) in LEADERBOARD_METRICS.items():
+            if col not in stats_df.columns:
+                continue
+            va = stats_df.loc[driver_a, col] if driver_a in stats_df.index else None
+            vb = stats_df.loc[driver_b, col] if driver_b in stats_df.index else None
+            if pd.isna(va) or pd.isna(vb):
+                continue
+            if lower_better:
+                winner = driver_a if va < vb else driver_b
+            else:
+                winner = driver_a if va > vb else driver_b
+            rows.append({"Metric": label, driver_a: f"{float(va):.1f}", driver_b: f"{float(vb):.1f}", "Edge": winner})
+        if rows:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Section 3: Season Arc ──────────────────────────────────────────────────
+    st.markdown(f"### {selected_driver} — Season Arc")
+    st.caption("Performance trajectory across the 5 races")
+
+    arc_df = season_arc(all_race_dfs, selected_driver)
+    if len(arc_df) == 0:
+        st.info(f"No season arc data for {selected_driver}.")
+        return
+
+    arc_metrics = [m for m in ["finish_position", "avg_pace_delta", "tyre_preservation",
+                                "aggression_level", "pressure_consistency"] if m in arc_df.columns]
+    metric_labels = {
+        "finish_position": "Finish Position",
+        "avg_pace_delta": "Avg Pace Delta (s)",
+        "tyre_preservation": "Tyre Preservation",
+        "aggression_level": "Aggression Level",
+        "pressure_consistency": "Pressure Consistency",
+    }
+
+    arc_col1, arc_col2 = st.columns(2)
+    driver_color = DRIVER_COLORS.get(selected_driver, "#AAAAAA")
+
+    for i, metric in enumerate(arc_metrics):
+        col = arc_col1 if i % 2 == 0 else arc_col2
+        vals = pd.to_numeric(arc_df[metric], errors="coerce")
+        if vals.isna().all():
+            continue
+        fig_arc = go.Figure()
+        fig_arc.add_trace(go.Scatter(
+            x=arc_df["race"],
+            y=vals,
+            mode="lines+markers",
+            line=dict(color=driver_color, width=2),
+            marker=dict(size=8, color=driver_color),
+            name=metric_labels.get(metric, metric),
+        ))
+        invert = metric in ("finish_position", "avg_pace_delta")
+        fig_arc.update_layout(
+            paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+            font=dict(color="white"),
+            xaxis=dict(title="Race", gridcolor="#2A2A2A", tickangle=-20),
+            yaxis=dict(title=metric_labels.get(metric, metric), gridcolor="#2A2A2A",
+                       autorange="reversed" if invert else True),
+            height=200,
+            margin=dict(l=50, r=20, t=20, b=60),
+            showlegend=False,
+        )
+        with col:
+            st.caption(metric_labels.get(metric, metric))
+            st.plotly_chart(fig_arc, use_container_width=True)

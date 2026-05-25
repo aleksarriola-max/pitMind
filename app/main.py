@@ -146,11 +146,12 @@ shifts = get_shifts(st.session_state.selected_race)
 if len(df) == 0:
     st.stop()
 
-tab_momentum, tab_soul, tab_pitwall, tab_track = st.tabs([
+tab_momentum, tab_soul, tab_pitwall, tab_track, tab_stats = st.tabs([
     "🌊 Momentum Map",
     "🧬 Driver Soul",
     "🔧 Pit Wall Mirror",
     "🏁 Track Intel",
+    "📊 Driver Stats",
 ])
 
 with tab_momentum:
@@ -181,3 +182,8 @@ with tab_track:
         st.session_state.selected_lap,
         st.session_state.mode,
     )
+
+with tab_stats:
+    from app.stats_view import render_driver_stats
+    all_race_dfs_stats = {slug: get_race_df(slug) for slug in RACES}
+    render_driver_stats(all_race_dfs_stats, st.session_state.selected_driver, st.session_state.mode)

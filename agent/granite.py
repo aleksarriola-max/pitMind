@@ -381,3 +381,184 @@ def reveal_outcome(
             f"Model pit_prob={instinct_prob:.3f} ({instinct_action}). "
             f"Dominant driver trait: {top_trait[0]}={top_trait[1]:.0f}"
         )
+
+
+def error_summary(error_log: list, driver: str, mode: str = "fan") -> str:
+    """
+    Narrative summary of a driver's incident log for the Pilot Error section.
+
+    error_log: list of dicts with keys lap, error_type, severity, description
+    """
+    if not error_log:
+        if mode == "fan":
+            return f"{driver} had a clean race — no notable errors or strategic missteps detected."
+        else:
+            return f"{driver}: 0 incidents detected. Pace and strategy nominal."
+
+    total = len(error_log)
+    types = {}
+    for e in error_log:
+        t = e.get("error_type", "UNKNOWN")
+        types[t] = types.get(t, 0) + 1
+
+    type_str = ", ".join(f"{v}x {k}" for k, v in types.items())
+    worst = max(error_log, key=lambda e: e.get("signal_value", 0))
+
+    prompt = (
+        f"Driver: {driver}\n"
+        f"Total incidents: {total}\n"
+        f"Breakdown: {type_str}\n"
+        f"Worst incident: Lap {worst.get('lap')} — {worst.get('description')}\n\n"
+        f"Write 2-3 sentences summarizing this driver's errors and what they cost them."
+    )
+
+    result = _call_granite(prompt, _system_prompt(mode))
+    if result:
+        return result
+
+    if mode == "fan":
+        return (
+            f"{driver} made {total} mistakes this race: {type_str}. "
+            f"The worst came on lap {worst.get('lap')}: {worst.get('description')}."
+        )
+    else:
+        return f"{driver} | {total} incidents | {type_str} | Worst: L{worst.get('lap')} {worst.get('error_type')} signal={worst.get('signal_value'):.2f}"
+
+
+def race_narrative(
+    shifts: list,
+    flag_periods: list,
+    final_positions: dict,
+    race_name: str,
+    mode: str = "fan",
+) -> str:
+    """
+    Full race narrative summarizing key moments, SC periods, and winner.
+
+    shifts: top momentum shifts [{driver, lap, direction, magnitude}]
+    flag_periods: [{flag, lap_start, lap_end}]
+    final_positions: {driver: position}
+    """
+    winner = min(final_positions.items(), key=lambda x: x[1])[0] if final_positions else "Unknown"
+    top_shifts = sorted(shifts, key=lambda s: s.get("magnitude", 0), reverse=True)[:5]
+    shifts_str = "; ".join(
+        f"Lap {s.get('lap')}: {s.get('driver')} {s.get('direction')} {s.get('magnitude', 0):.0f}pts"
+        for s in top_shifts
+    )
+    sc_str = ", ".join(
+        f"Laps {p['lap_start']}-{p['lap_end']} ({p['flag'].replace('_', ' ')})"
+        for p in flag_periods if p.get("flag") in ("SAFETY_CAR", "VIRTUAL_SAFETY_CAR")
+    ) or "None"
+    positions_str = ", ".join(f"{d} P{p}" for d, p in sorted(final_positions.items(), key=lambda x: x[1])[:5])
+
+    prompt = (
+        f"Race: {race_name}\n"
+        f"Winner: {winner}\n"
+        f"Final order (top 5): {positions_str}\n"
+        f"Safety car / VSC periods: {sc_str}\n"
+        f"Top momentum shifts: {shifts_str}\n\n"
+        f"Write a 4-6 sentence race narrative covering the key story, pivotal moments, and why {winner} won."
+    )
+
+    result = _call_granite(prompt, _system_prompt(mode))
+    if result:
+        return result
+
+    sc_note = f" A safety car at {sc_str} reshuffled the order." if sc_str != "None" else ""
+    if mode == "fan":
+        return (
+            f"{winner} took the victory in {race_name}.{sc_note} "
+            f"The race hinged on momentum swings at {', '.join(f'lap {s.get(\"lap\")}' for s in top_shifts[:3])}. "
+            f"It was a race decided by strategy, nerve, and tyre management."
+        )
+    else:
+        return (
+            f"{race_name} | Winner: {winner} | SC: {sc_str} | "
+            f"Key shifts: {shifts_str} | Final: {positions_str}"
+        )
+
+
+def driver_of_race(driver: str, stats: dict, mode: str = "fan") -> str:
+    """
+    Highlight the standout performer of the race.
+
+    stats: {positions_gained, momentum_gain, error_count, top_trait, top_trait_val}
+    """
+    gained = stats.get("positions_gained", 0)
+    momentum = stats.get("momentum_gain", 0)
+    errors = stats.get("error_count", 0)
+    top_trait = stats.get("top_trait", "aggression_level")
+    top_val = stats.get("top_trait_val", 70)
+
+    prompt = (
+        f"Driver of the Race: {driver}\n"
+        f"Positions gained from grid: {gained}\n"
+        f"Net momentum gain: {momentum:.0f} pts\n"
+        f"Incidents: {errors}\n"
+        f"Dominant behavioral trait: {top_trait} ({top_val:.0f}/100)\n\n"
+        f"Write 2-3 sentences explaining why {driver} was the standout performer this race."
+    )
+
+    result = _call_granite(prompt, _system_prompt(mode))
+    if result:
+        return result
+
+    if mode == "fan":
+        return (
+            f"{driver} was the driver of the race — gaining {gained} positions and building "
+            f"{momentum:.0f} momentum points while making just {errors} mistake(s). "
+            f"Their {top_trait.replace('_', ' ')} drove every key moment."
+        )
+    else:
+        return (
+            f"Driver of Race: {driver} | +{gained} pos | momentum_gain={momentum:.0f} | "
+            f"incidents={errors} | dominant_trait={top_trait}={top_val:.0f}"
+        )
+
+
+def h2h_narrative(
+    driver_a: str,
+    driver_b: str,
+    stats_a: dict,
+    stats_b: dict,
+    mode: str = "fan",
+) -> str:
+    """
+    Head-to-head narrative comparing two drivers' season stats.
+
+    stats: dict with keys matching compute_season_stats columns
+    """
+    def fmt(s: dict) -> str:
+        return (
+            f"avg_finish={s.get('avg_finish', '?')}, "
+            f"avg_positions_gained={s.get('avg_positions_gained', '?')}, "
+            f"tyre_preservation={s.get('tyre_preservation', '?')}, "
+            f"aggression_level={s.get('aggression_level', '?')}, "
+            f"pressure_consistency={s.get('pressure_consistency', '?')}"
+        )
+
+    prompt = (
+        f"Head-to-head season comparison:\n"
+        f"{driver_a}: {fmt(stats_a)}\n"
+        f"{driver_b}: {fmt(stats_b)}\n\n"
+        f"Write 2-3 sentences comparing these two drivers — who has the edge overall and where does each driver win?"
+    )
+
+    result = _call_granite(prompt, _system_prompt(mode))
+    if result:
+        return result
+
+    a_finish = stats_a.get("avg_finish", 10)
+    b_finish = stats_b.get("avg_finish", 10)
+    edge = driver_a if (a_finish or 20) < (b_finish or 20) else driver_b
+    other = driver_b if edge == driver_a else driver_a
+    if mode == "fan":
+        return (
+            f"Over the season, {edge} has the upper hand in race results. "
+            f"But {other} fights back in specific areas — the data tells a story of two very different styles."
+        )
+    else:
+        return (
+            f"H2H: {driver_a} avg_finish={a_finish} vs {driver_b} avg_finish={b_finish}. "
+            f"Edge: {edge}. Full stats above."
+        )

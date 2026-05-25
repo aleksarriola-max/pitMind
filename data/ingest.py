@@ -5,6 +5,7 @@ Call build_race_dataframe() to get the unified DataFrame.
 """
 
 import os
+import json
 import time
 import logging
 import requests
@@ -416,3 +417,94 @@ def load_race(slug: str) -> pd.DataFrame:
     if not os.path.exists(path):
         raise FileNotFoundError(f"No cached data for {slug}. Run build_data.py first.")
     return pd.read_parquet(path)
+
+
+# ---------------------------------------------------------------------------
+# Flag / Race Control helpers
+# ---------------------------------------------------------------------------
+
+def _build_flag_periods(race_ctrl_df: pd.DataFrame) -> list:
+    """Convert race_control rows into consolidated flag period dicts."""
+    if len(race_ctrl_df) == 0 or "lap_number" not in race_ctrl_df.columns:
+        return []
+
+    rc = race_ctrl_df.copy()
+    rc["lap_number"] = pd.to_numeric(rc["lap_number"], errors="coerce")
+    rc = rc.dropna(subset=["lap_number"])
+    rc["lap_number"] = rc["lap_number"].astype(int)
+    periods = []
+
+    msg_col = "message" if "message" in rc.columns else None
+
+    if msg_col:
+        # Safety Car
+        sc_starts = rc[rc[msg_col].str.contains("SAFETY CAR DEPLOYED|SAFETY CAR OUT", case=False, na=False)]
+        sc_ends   = rc[rc[msg_col].str.contains("SAFETY CAR IN THIS LAP|SAFETY CAR WITHDRAWN|GREEN LIGHT|TRACK CLEAR", case=False, na=False)]
+        for _, row in sc_starts.iterrows():
+            lap_s = int(row["lap_number"])
+            after = sc_ends[sc_ends["lap_number"] > lap_s]
+            lap_e = int(after["lap_number"].min()) if len(after) > 0 else lap_s + 5
+            periods.append({"flag": "SAFETY_CAR", "lap_start": lap_s, "lap_end": lap_e})
+
+        # Virtual Safety Car
+        vsc_starts = rc[rc[msg_col].str.contains("VIRTUAL SAFETY CAR DEPLOYED", case=False, na=False)]
+        vsc_ends   = rc[rc[msg_col].str.contains("VIRTUAL SAFETY CAR ENDING|VIRTUAL SAFETY CAR WITHDRAWN", case=False, na=False)]
+        for _, row in vsc_starts.iterrows():
+            lap_s = int(row["lap_number"])
+            after = vsc_ends[vsc_ends["lap_number"] > lap_s]
+            lap_e = int(after["lap_number"].min()) if len(after) > 0 else lap_s + 3
+            periods.append({"flag": "VIRTUAL_SAFETY_CAR", "lap_start": lap_s, "lap_end": lap_e})
+
+    # Yellow / Red from flag column
+    if "flag" in rc.columns:
+        for flag_val, label in [("YELLOW", "YELLOW"), ("DOUBLE YELLOW", "DOUBLE_YELLOW"), ("RED", "RED")]:
+            rows = rc[rc["flag"] == flag_val]
+            for _, row in rows.iterrows():
+                lap_n = int(row["lap_number"])
+                periods.append({"flag": label, "lap_start": lap_n, "lap_end": lap_n + 1})
+
+    return periods
+
+
+def save_flags(flag_periods: list, slug: str) -> str:
+    """Save flag periods list to JSON."""
+    path = os.path.join(CACHE_DIR, f"{slug}_flags.json")
+    with open(path, "w") as f:
+        json.dump(flag_periods, f, indent=2)
+    log.info(f"Saved {len(flag_periods)} flag periods to {path}")
+    return path
+
+
+def load_flags(slug: str, df: "pd.DataFrame | None" = None) -> list:
+    """
+    Load flag periods for a race.
+    Prefers pre-saved JSON; falls back to deriving SC from safety_car_active column.
+    """
+    json_path = os.path.join(CACHE_DIR, f"{slug}_flags.json")
+    if os.path.exists(json_path):
+        with open(json_path) as f:
+            return json.load(f)
+
+    # Fallback: derive SC periods from safety_car_active column
+    if df is not None and "safety_car_active" in df.columns:
+        sc_laps = sorted(df[df["safety_car_active"]]["lap"].unique())
+        if not sc_laps:
+            return []
+        periods, start, prev = [], sc_laps[0], sc_laps[0]
+        for lap in sc_laps[1:]:
+            if lap > prev + 1:
+                periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
+                start = lap
+            prev = lap
+        periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
+        return periods
+
+    return []
+
+
+def build_flags(slug: str) -> list:
+    """Pull race_control from OpenF1, derive flag periods, and save to JSON."""
+    openf1_result = pull_openf1(slug)
+    periods = _build_flag_periods(openf1_result.get("race_control", pd.DataFrame()))
+    save_flags(periods, slug)
+    return periods

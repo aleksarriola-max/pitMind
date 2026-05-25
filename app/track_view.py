@@ -354,3 +354,56 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                 )
     else:
         st.write("No close battles forecast in the next 15 laps.")
+
+    st.divider()
+
+    # ── Pilot Error & Strategy Oversight ──────────────────────────────────────
+    st.subheader("Pilot Error & Strategy Oversight")
+    st.caption("Detected from telemetry: lock-ups, pace collapses, late pits, SC restart losses, radio stress")
+
+    from models.error_detection import detect_pilot_errors, error_counts, total_errors
+    from data.ingest import load_flags
+    from agent.granite import error_summary
+
+    flag_periods = load_flags(race_slug, df)
+    error_df = detect_pilot_errors(df, flag_periods)
+    counts = error_counts(error_df)
+
+    mode_label = "Fan" if mode == "fan" else "Engineer"
+
+    if len(counts) == 0:
+        st.info("No pilot errors detected for this race (may require radio sentiment data for full coverage).")
+    else:
+        # Summary row — all drivers
+        st.markdown("**Error Summary — All Drivers**")
+        summary_cols = st.columns(min(len(counts), 4))
+        for i, (drv, type_counts) in enumerate(sorted(counts.items(), key=lambda x: sum(x[1].values()), reverse=True)):
+            total = sum(type_counts.values())
+            col = summary_cols[i % len(summary_cols)]
+            col.metric(drv, f"{total} errors", " · ".join(f"{v} {k.replace('_',' ').lower()}" for k, v in type_counts.items()))
+
+        st.divider()
+
+        # Selected driver detail
+        st.markdown(f"**{driver} — Incident Log**")
+        drv_errors = error_df[error_df["driver"] == driver] if len(error_df) > 0 else pd.DataFrame()
+
+        # Granite summary
+        drv_error_list = drv_errors.to_dict("records") if len(drv_errors) > 0 else []
+        granite_err = error_summary(drv_error_list, driver, mode)
+        st.info(f"**{mode_label} Analysis:** {granite_err}")
+
+        if len(drv_errors) > 0:
+            ERROR_ICONS = {
+                "LOCKUP": "⚡", "PACE_COLLAPSE": "📉", "LATE_PIT": "🔧",
+                "SC_LOSS": "🚨", "RADIO_STRESS": "📻", "TRACK_LIMITS": "⚠️",
+            }
+            for _, row in drv_errors.iterrows():
+                icon = ERROR_ICONS.get(row["error_type"], "•")
+                severity_color = "🔴" if row["severity"] == "major" else "🟡"
+                st.markdown(
+                    f"{severity_color} **Lap {int(row['lap'])}** {icon} `{row['error_type']}` — "
+                    f"{row['description']} *(signal: {row['signal_value']:.2f})*"
+                )
+        else:
+            st.success(f"{driver} had a clean race — no errors detected.")

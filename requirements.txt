@@ -1,0 +1,15 @@
+fastf1>=3.3
+requests
+pandas
+numpy
+pyarrow
+scipy
+openai-whisper
+textblob
+umap-learn
+xgboost
+shap
+scikit-learn
+joblib
+streamlit>=1.30
+plotly

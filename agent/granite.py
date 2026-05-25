@@ -279,6 +279,61 @@ def pitwall_brief(lap_data: dict, mode: str = "fan") -> str:
         )
 
 
+def track_intel_brief(circuit_data: dict, sector_dominance: dict, mode: str = "fan") -> str:
+    """
+    Summarize track characteristics and sector advantages for the Track Intel tab.
+
+    circuit_data: from CIRCUIT_PROFILES dict
+    sector_dominance: {driver: {"sector1": delta_ms, "sector2": delta_ms, "sector3": delta_ms}}
+    """
+    track_char = circuit_data.get("track_character", "")
+    drs_zones = circuit_data.get("drs_zones", 2)
+    overtaking_diff = circuit_data.get("overtaking_difficulty", 50)
+    agg_sectors = circuit_data.get("aggression_sectors", [1])
+
+    # Find top sector performers
+    sector_leaders = {}
+    for sector_key in ["sector1", "sector2", "sector3"]:
+        best_driver = None
+        best_delta = float("inf")
+        for drv, deltas in sector_dominance.items():
+            d = deltas.get(sector_key, 0)
+            if d < best_delta:
+                best_delta = d
+                best_driver = drv
+        if best_driver:
+            sector_leaders[sector_key] = f"{best_driver} ({best_delta:+.0f}ms)"
+
+    leaders_str = ", ".join(f"S{i+1}: {v}" for i, (_, v) in enumerate(sector_leaders.items()))
+
+    prompt = (
+        f"Circuit: {track_char}\n"
+        f"DRS zones: {drs_zones} | Overtaking difficulty: {overtaking_diff}/100\n"
+        f"Aggression pays in: Sector {', '.join(str(s) for s in agg_sectors)}\n"
+        f"Sector pace leaders: {leaders_str or 'data unavailable'}\n\n"
+        f"Summarize in 2-3 sentences: what does this circuit demand from drivers, "
+        f"and which drivers have an advantage based on their sector times?"
+    )
+
+    result = _call_granite(prompt, _system_prompt(mode))
+    if result:
+        return result
+
+    # Fallback
+    diff_word = "easy" if overtaking_diff < 40 else "difficult"
+    if mode == "fan":
+        return (
+            f"This circuit makes overtaking {diff_word} — {drs_zones} DRS zone(s) "
+            f"create the main passing opportunities. "
+            f"Sector {agg_sectors[0]} aggression is key to gaining positions."
+        )
+    else:
+        return (
+            f"Circuit overtaking_difficulty={overtaking_diff}/100 | DRS zones={drs_zones} | "
+            f"Aggression sector(s): {agg_sectors}. {leaders_str}."
+        )
+
+
 def reveal_outcome(
     choice: str,
     actual_outcome: str,

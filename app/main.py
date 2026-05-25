@@ -27,7 +27,7 @@ st.set_page_config(
 
 def _init_state():
     defaults = {
-        "selected_race": "bahrain_2023",
+        "selected_race": "bahrain_2025",
         "selected_driver": "VER",
         "selected_lap": 1,
         "mode": "fan",
@@ -143,10 +143,11 @@ shifts = get_shifts(st.session_state.selected_race)
 if len(df) == 0:
     st.stop()
 
-tab_momentum, tab_soul, tab_pitwall = st.tabs([
+tab_momentum, tab_soul, tab_pitwall, tab_track = st.tabs([
     "🌊 Momentum Map",
     "🧬 Driver Soul",
     "🔧 Pit Wall Mirror",
+    "🏁 Track Intel",
 ])
 
 with tab_momentum:
@@ -163,5 +164,17 @@ with tab_pitwall:
         df,
         st.session_state.selected_driver,
         st.session_state.replay_lap or st.session_state.selected_lap,
+        st.session_state.mode,
+    )
+
+with tab_track:
+    from app.track_view import render_track_intel
+    all_race_dfs = {slug: get_race_df(slug) for slug in RACES}
+    render_track_intel(
+        df,
+        st.session_state.selected_race,
+        all_race_dfs,
+        st.session_state.selected_driver,
+        st.session_state.selected_lap,
         st.session_state.mode,
     )

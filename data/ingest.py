@@ -20,11 +20,11 @@ FASTF1_CACHE_DIR = os.path.join(CACHE_DIR, "fastf1")
 OPENF1_BASE = "https://api.openf1.org/v1"
 
 RACES = {
-    "bahrain_2023":     {"year": 2023, "round": 1,  "name": "Bahrain 2023"},
-    "monaco_2023":      {"year": 2023, "round": 6,  "name": "Monaco 2023"},
-    "silverstone_2023": {"year": 2023, "round": 10, "name": "Silverstone 2023"},
-    "monza_2023":       {"year": 2023, "round": 14, "name": "Monza 2023"},
-    "abudhabi_2023":    {"year": 2023, "round": 22, "name": "Abu Dhabi 2023"},
+    "bahrain_2025":     {"year": 2025, "round": 4,  "name": "Bahrain 2025",   "openf1_circuit": "bahrain"},
+    "monaco_2025":      {"year": 2025, "round": 8,  "name": "Monaco 2025",    "openf1_circuit": "monaco"},
+    "silverstone_2025": {"year": 2025, "round": 12, "name": "British 2025",   "openf1_circuit": "silverstone"},
+    "monza_2025":       {"year": 2025, "round": 16, "name": "Italian 2025",   "openf1_circuit": "monza"},
+    "abudhabi_2025":    {"year": 2025, "round": 24, "name": "Abu Dhabi 2025", "openf1_circuit": "abu_dhabi"},
 }
 
 DRIVERS = ["VER", "HAM", "LEC", "SAI", "ALO", "PER", "NOR", "RUS"]
@@ -120,7 +120,24 @@ def pull_fastf1(year: int, round_num: int) -> dict:
     sc_laps = _extract_sc_laps(session)
     lap_df["safety_car_active"] = lap_df["lap"].isin(sc_laps)
 
-    return {"lap_df": lap_df, "session": session}
+    return {"lap_df": lap_df, "session": session, "year": year, "round_num": round_num}
+
+
+def pull_qualifying(year: int, round_num: int) -> dict:
+    """Pull qualifying results and return {driver_code: grid_position} mapping."""
+    try:
+        session = fastf1.get_session(year, round_num, "Q")
+        session.load(telemetry=False, weather=False, messages=False)
+        laps = session.laps.copy()
+        laps = laps[laps["Driver"].isin(DRIVERS) & laps["LapTime"].notna()]
+        best = laps.groupby("Driver")["LapTime"].min().reset_index()
+        best = best.dropna(subset=["LapTime"]).sort_values("LapTime").reset_index(drop=True)
+        result = {row["Driver"]: int(i + 1) for i, (_, row) in enumerate(best.iterrows())}
+        log.info(f"Qualifying grid: {result}")
+        return result
+    except Exception as e:
+        log.warning(f"Could not load qualifying for {year} round {round_num}: {e}")
+        return {}
 
 
 def _approx_weather(weather_df: pd.DataFrame, lap_num: int, session) -> float:
@@ -162,26 +179,37 @@ def _extract_sc_laps(session) -> set:
 # OpenF1 pull
 # ---------------------------------------------------------------------------
 
-OPENF1_MEETING_KEYS = {
-    "bahrain_2023":     1141,
-    "monaco_2023":      1210,
-    "silverstone_2023": 1214,
-    "monza_2023":       1218,
-    "abudhabi_2023":    1226,
-}
-
-OPENF1_SESSION_KEYS = {
-    "bahrain_2023":     7953,
-    "monaco_2023":      9094,
-    "silverstone_2023": 9126,
-    "monza_2023":       9157,
-    "abudhabi_2023":    9197,
-}
-
 OPENF1_DRIVER_NUMS = {
     "VER": "1", "HAM": "44", "LEC": "16", "SAI": "55",
     "ALO": "14", "PER": "11", "NOR": "4", "RUS": "63",
 }
+
+_session_key_cache: dict[str, int] = {}
+
+
+def _get_openf1_session_key(slug: str) -> int | None:
+    """Auto-lookup OpenF1 session key by querying the /sessions endpoint."""
+    if slug in _session_key_cache:
+        return _session_key_cache[slug]
+
+    race_info = RACES.get(slug, {})
+    year = race_info.get("year")
+    circuit = race_info.get("openf1_circuit", "")
+    if not year or not circuit:
+        return None
+
+    sessions = _openf1_get("sessions", {"year": year, "session_name": "Race"})
+    for s in sessions:
+        key = s.get("circuit_short_name", "").lower().replace("-", "_").replace(" ", "_")
+        if circuit.lower() in key or key in circuit.lower():
+            sk = s.get("session_key")
+            if sk:
+                _session_key_cache[slug] = int(sk)
+                log.info(f"Auto-resolved OpenF1 session_key for {slug}: {sk}")
+                return int(sk)
+
+    log.warning(f"Could not auto-resolve OpenF1 session_key for {slug} (circuit='{circuit}', year={year})")
+    return None
 
 
 def _openf1_get(endpoint: str, params: dict, retries: int = 3) -> list:
@@ -203,9 +231,9 @@ def _openf1_get(endpoint: str, params: dict, retries: int = 3) -> list:
 
 def pull_openf1(slug: str) -> dict:
     """Pull interval, position, race_control, and weather data from OpenF1."""
-    session_key = OPENF1_SESSION_KEYS.get(slug)
+    session_key = _get_openf1_session_key(slug)
     if session_key is None:
-        log.warning(f"No OpenF1 session key for {slug}")
+        log.warning(f"No OpenF1 session key for {slug}, skipping OpenF1 data")
         return {"intervals": pd.DataFrame(), "position": pd.DataFrame(),
                 "race_control": pd.DataFrame(), "weather": pd.DataFrame()}
 
@@ -233,10 +261,17 @@ def pull_openf1(slug: str) -> dict:
 # Merge FastF1 + OpenF1 → unified per-lap DataFrame
 # ---------------------------------------------------------------------------
 
-def merge_to_lap_df(fastf1_result: dict, openf1_result: dict, race_name: str) -> pd.DataFrame:
+def merge_to_lap_df(fastf1_result: dict, openf1_result: dict, race_name: str,
+                    grid_positions: dict | None = None) -> pd.DataFrame:
     """Merge FastF1 and OpenF1 data into the unified per-lap schema."""
     df = fastf1_result["lap_df"].copy()
     df["race"] = race_name
+
+    # Grid position from qualifying (constant per driver per race)
+    if grid_positions:
+        df["grid_position"] = df["driver"].map(grid_positions).fillna(10).astype(int)
+    else:
+        df["grid_position"] = 10  # fallback midfield
 
     # --- gap_ahead / gap_behind from OpenF1 intervals (timestamp-based merge) ---
     intervals = openf1_result["intervals"]
@@ -361,7 +396,8 @@ def build_race_dataframe(slug: str) -> pd.DataFrame:
     race_info = RACES[slug]
     fastf1_result = pull_fastf1(race_info["year"], race_info["round"])
     openf1_result = pull_openf1(slug)
-    df = merge_to_lap_df(fastf1_result, openf1_result, race_info["name"])
+    grid_positions = pull_qualifying(race_info["year"], race_info["round"])
+    df = merge_to_lap_df(fastf1_result, openf1_result, race_info["name"], grid_positions)
     return df
 
 

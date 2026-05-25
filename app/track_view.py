@@ -7,7 +7,6 @@ import plotly.express as px
 import streamlit as st
 
 from models.race_forecast import forecast_positions, get_aggression_zone_stats
-from agent.granite import track_intel_brief
 
 TEAM_COLORS = {
     "Red Bull Racing": "#3671C6",
@@ -118,6 +117,7 @@ def _grid_finish_df(all_dfs: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, driver: str, lap: int, mode: str):
+    from agent.granite import track_intel_brief
     circuit = _get_circuit_profile(race_slug)
 
     # ── Circuit Profile Card ───────────────────────────────────────────────────

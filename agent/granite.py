@@ -19,9 +19,9 @@ import requests
 
 log = logging.getLogger(__name__)
 
-GRANITE_MODEL = "ibm/granite-13b-chat-v2"
+GRANITE_MODEL = "ibm/granite-4-h-small"
 IAM_TOKEN_URL = "https://iam.cloud.ibm.com/identity/token"
-GENERATION_PATH = "/ml/v1/text/generation?version=2023-05-29"
+CHAT_PATH = "/ml/v1/text/chat?version=2023-05-29"
 
 # ---------------------------------------------------------------------------
 # System prompts
@@ -125,23 +125,23 @@ def _call_granite(user_prompt: str, system_prompt: str) -> str | None:
     if not token:
         return None
 
-    full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{user_prompt}\n<|assistant|>\n"
     payload = {
         "model_id": GRANITE_MODEL,
-        "input": full_prompt,
         "project_id": project_id,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
         "parameters": {
-            "max_new_tokens": 150,
-            "min_new_tokens": 20,
+            "max_tokens": 150,
             "temperature": 0.7,
             "top_p": 0.9,
-            "decoding_method": "sample",
         },
     }
 
     try:
         resp = requests.post(
-            watsonx_url + GENERATION_PATH,
+            watsonx_url + CHAT_PATH,
             json=payload,
             headers={
                 "Authorization": f"Bearer {token}",
@@ -152,7 +152,7 @@ def _call_granite(user_prompt: str, system_prompt: str) -> str | None:
         )
         resp.raise_for_status()
         data = resp.json()
-        text = data["results"][0]["generated_text"].strip()
+        text = data["choices"][0]["message"]["content"].strip()
         _response_cache[cache_key] = text
         return text
     except Exception as e:

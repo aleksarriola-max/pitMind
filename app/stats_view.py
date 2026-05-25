@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data.ingest import DRIVERS
-from models.driver_stats import compute_season_stats, season_arc, rank_drivers
 
 DRIVER_COLORS = {
     "VER": "#3671C6", "HAM": "#E8002D", "LEC": "#E8002D",
@@ -40,6 +39,7 @@ RADAR_LABELS = [
 
 
 def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
+    from models.driver_stats import compute_season_stats, season_arc, rank_drivers
     st.subheader("Driver Statistics — 2025 Season")
 
     stats_df = compute_season_stats(all_race_dfs)

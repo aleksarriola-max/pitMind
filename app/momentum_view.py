@@ -37,6 +37,34 @@ FLAG_COLORS = {
 }
 
 
+def _derive_flag_periods(race_slug: str, df: pd.DataFrame) -> list:
+    """Derive flag periods without depending on load_flags from ingest.
+    Tries the pre-saved JSON first; falls back to safety_car_active column."""
+    import os, json
+    cache_path = os.path.join(os.path.dirname(__file__), "..", "data", "cache", f"{race_slug}_flags.json")
+    try:
+        if os.path.exists(cache_path):
+            with open(cache_path) as f:
+                return json.load(f)
+    except Exception:
+        pass
+
+    # Fallback: derive SC periods from safety_car_active column
+    if "safety_car_active" not in df.columns:
+        return []
+    sc_laps = sorted(df[df["safety_car_active"]]["lap"].unique())
+    if not sc_laps:
+        return []
+    periods, start, prev = [], sc_laps[0], sc_laps[0]
+    for lap in sc_laps[1:]:
+        if lap > prev + 1:
+            periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
+            start = lap
+        prev = lap
+    periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
+    return periods
+
+
 @st.cache_data(show_spinner=False)
 def _get_shift_annotation(shift_json: str, mode: str) -> str:
     from agent.granite import annotate_shift
@@ -98,9 +126,8 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
     race_slug = df["race"].iloc[0].lower().replace(" ", "_") if "race" in df.columns else ""
     st.caption(f"{race_name} · Momentum score per car per lap (0–100)")
 
-    # Load flag periods
-    from data.ingest import load_flags
-    flag_periods = load_flags(race_slug, df)
+    # Load flag periods — try pre-saved JSON, fall back to safety_car_active column
+    flag_periods = _derive_flag_periods(race_slug, df)
 
     # Driver filter
     available_drivers = [d for d in DRIVERS if d in df["driver"].unique()]

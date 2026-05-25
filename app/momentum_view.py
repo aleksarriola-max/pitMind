@@ -95,8 +95,8 @@ def _pick_driver_of_race(df: pd.DataFrame, shifts: list) -> tuple[str, dict]:
     candidates = {}
     for driver, grp in df.groupby("driver"):
         grp = grp.sort_values("lap")
-        grid = grp["grid_position"].dropna()
-        final_pos = grp["position"].dropna()
+        grid = grp["grid_position"].dropna() if "grid_position" in grp.columns else pd.Series(dtype=float)
+        final_pos = grp["position"].dropna() if "position" in grp.columns else pd.Series(dtype=float)
         gained = (int(grid.iloc[0]) - int(final_pos.iloc[-1])) if len(grid) > 0 and len(final_pos) > 0 else 0
         driver_shifts = [s for s in shifts if s.get("driver") == driver]
         momentum_gain = sum(s["magnitude"] for s in driver_shifts if s.get("direction") == "up") - \
@@ -111,6 +111,8 @@ def _pick_driver_of_race(df: pd.DataFrame, shifts: list) -> tuple[str, dict]:
             "score": score, "positions_gained": gained, "momentum_gain": momentum_gain,
             "error_count": 0, "top_trait": top_trait[0], "top_trait_val": top_trait[1],
         }
+    if not candidates:
+        return "N/A", {}
     best = max(candidates.items(), key=lambda x: x[1]["score"])
     return best[0], best[1]
 

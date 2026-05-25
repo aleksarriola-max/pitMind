@@ -362,10 +362,25 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     st.caption("Detected from telemetry: lock-ups, pace collapses, late pits, SC restart losses, radio stress")
 
     from models.error_detection import detect_pilot_errors, error_counts, total_errors
-    from data.ingest import load_flags
     from agent.granite import error_summary
 
-    flag_periods = load_flags(race_slug, df)
+    # Derive flag periods without importing load_flags (avoids sys.modules cache issues)
+    try:
+        import os as _os, json as _json
+        _cache = _os.path.join(_os.path.dirname(__file__), "..", "data", "cache", f"{race_slug}_flags.json")
+        flag_periods = _json.load(open(_cache)) if _os.path.exists(_cache) else []
+    except Exception:
+        flag_periods = []
+    if not flag_periods and "safety_car_active" in df.columns:
+        sc_laps = sorted(df[df["safety_car_active"]]["lap"].unique())
+        flag_periods, start, prev = [], sc_laps[0] if sc_laps else None, sc_laps[0] if sc_laps else None
+        for lap in (sc_laps[1:] if sc_laps else []):
+            if lap > prev + 1:
+                flag_periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
+                start = lap
+            prev = lap
+        if sc_laps:
+            flag_periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
     error_df = detect_pilot_errors(df, flag_periods)
     counts = error_counts(error_df)
 

@@ -25,9 +25,9 @@ def compute_season_stats(all_race_dfs: dict) -> pd.DataFrame:
         race_name = df["race"].iloc[0] if "race" in df.columns else slug
         for driver, grp in df.groupby("driver"):
             grp = grp.sort_values("lap")
-            final_pos = grp["position"].dropna()
-            grid_pos = grp["grid_position"].dropna()
-            lap_times = grp["lap_time"].dropna()
+            final_pos = grp["position"].dropna() if "position" in grp.columns else pd.Series(dtype=float)
+            grid_pos = grp["grid_position"].dropna() if "grid_position" in grp.columns else pd.Series(dtype=float)
+            lap_times = grp["lap_time"].dropna() if "lap_time" in grp.columns else pd.Series(dtype=float)
 
             row = {
                 "driver": driver,

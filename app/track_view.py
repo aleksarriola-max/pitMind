@@ -148,8 +148,24 @@ CIRCUIT_PATHS = {
 CIRCUIT_PATHS["abu_dhabi"] = CIRCUIT_PATHS["abudhabi"]
 
 
-def _render_circuit_map(race_slug: str):
-    """Return a Plotly figure with the circuit layout drawn from pre-defined waypoints."""
+def _position_on_path(x_s: list, y_s: list, fraction: float) -> tuple:
+    """Return the (x, y) coordinate at `fraction` (0.0–1.0) along the arc-length of the path."""
+    xs, ys = np.array(x_s), np.array(y_s)
+    dx, dy = np.diff(xs), np.diff(ys)
+    seg_lengths = np.sqrt(dx**2 + dy**2)
+    cumulative = np.concatenate([[0], np.cumsum(seg_lengths)])
+    total = cumulative[-1]
+    target = (fraction % 1.0) * total
+    idx = int(np.searchsorted(cumulative, target) - 1)
+    idx = max(0, min(idx, len(xs) - 2))
+    remaining = target - cumulative[idx]
+    seg_len = seg_lengths[idx]
+    t = remaining / seg_len if seg_len > 0 else 0.0
+    return float(xs[idx] + t * dx[idx]), float(ys[idx] + t * dy[idx])
+
+
+def _render_circuit_map(race_slug: str, lap_df=None):
+    """Return a Plotly figure with the circuit layout and optional driver position dots."""
     path_data = None
     for key in CIRCUIT_PATHS:
         if key in race_slug.lower() and CIRCUIT_PATHS[key] is not None:
@@ -158,7 +174,6 @@ def _render_circuit_map(race_slug: str):
     if not path_data:
         return None
 
-    import numpy as np
     x_pts = list(path_data["x"])
     y_pts = list(path_data["y"])
 
@@ -200,6 +215,36 @@ def _render_circuit_map(race_slug: str):
         hoverinfo="skip",
     ))
 
+    # Driver position dots for this lap
+    if lap_df is not None and len(lap_df) > 0 and "position" in lap_df.columns:
+        lap_sorted = lap_df.dropna(subset=["position"]).sort_values("position").head(8)
+        lap_time_est = float(lap_df["lap_time"].median()) if "lap_time" in lap_df.columns else 90.0
+        if pd.isna(lap_time_est) or lap_time_est <= 0:
+            lap_time_est = 90.0
+        LEADER_FRACTION = 0.92
+        cumulative_gap = 0.0
+        for _, row in lap_sorted.iterrows():
+            gap = float(row["gap_ahead"]) if "gap_ahead" in row and pd.notna(row["gap_ahead"]) else 0.0
+            cumulative_gap += gap
+            fraction = (LEADER_FRACTION - cumulative_gap / lap_time_est) % 1.0
+            x_d, y_d = _position_on_path(x_s, y_s, fraction)
+            drv = str(row["driver"])
+            color = DRIVER_COLORS.get(drv, "#AAAAAA")
+            pos = int(row["position"])
+            fig.add_trace(go.Scatter(
+                x=[x_d], y=[y_d],
+                mode="markers+text",
+                marker=dict(size=13, color=color, symbol="circle",
+                            line=dict(color="white", width=1.5)),
+                text=[drv],
+                textposition="top center",
+                textfont=dict(color="white", size=9),
+                name=f"P{pos} {drv}",
+                showlegend=True,
+                hovertext=f"P{pos} — {drv}",
+                hoverinfo="text",
+            ))
+
     fig.update_layout(
         paper_bgcolor="#0F0F0F",
         plot_bgcolor="#0F0F0F",
@@ -208,6 +253,11 @@ def _render_circuit_map(race_slug: str):
         margin=dict(l=10, r=10, t=45, b=10),
         height=320,
         title=dict(text=f"<b>{path_data['name']}</b>", font=dict(color="white", size=13), x=0.5),
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.05, x=0.0,
+            font=dict(color="white", size=10),
+            bgcolor="rgba(0,0,0,0)",
+        ),
     )
     return fig
 
@@ -289,7 +339,8 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     st.info(f"**{mode_label} Intel:** {granite_brief}")
 
     # ── Circuit Layout Diagram ─────────────────────────────────────────────────
-    fig_circuit = _render_circuit_map(race_slug)
+    lap_df = df[df["lap"] == lap].copy() if "lap" in df.columns else pd.DataFrame()
+    fig_circuit = _render_circuit_map(race_slug, lap_df=lap_df)
     if fig_circuit:
         st.subheader("Circuit Layout")
         st.plotly_chart(fig_circuit, use_container_width=True)

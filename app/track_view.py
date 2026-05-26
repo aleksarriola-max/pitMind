@@ -81,21 +81,135 @@ DRIVER_COLORS = {
     "NOR": "#FF8000", "RUS": "#27F4D2",
 }
 
-CIRCUIT_COORDS = {
-    "bahrain":     {"lat": 26.0325, "lon": 50.5106, "zoom": 13, "name": "Bahrain International Circuit"},
-    "monaco":      {"lat": 43.7347, "lon": 7.4206,  "zoom": 14, "name": "Circuit de Monaco"},
-    "silverstone": {"lat": 52.0786, "lon": -1.0169, "zoom": 13, "name": "Silverstone Circuit"},
-    "monza":       {"lat": 45.6156, "lon": 9.2811,  "zoom": 14, "name": "Autodromo Nazionale Monza"},
-    "abudhabi":    {"lat": 24.4672, "lon": 54.6031, "zoom": 13, "name": "Yas Marina Circuit"},
-    "abu_dhabi":   {"lat": 24.4672, "lon": 54.6031, "zoom": 13, "name": "Yas Marina Circuit"},
+# Hand-crafted circuit path waypoints (x, y normalized).
+# Each path is closed (first == last point), traced in racing direction.
+CIRCUIT_PATHS = {
+    "bahrain": {
+        "name": "Bahrain International Circuit",
+        # Clockwise. S/F at left, main straight going right.
+        # T1-3 complex at top-right, T10 hairpin at bottom-left.
+        "x": [1.0, 7.0, 7.8, 8.5, 9.0, 9.0, 8.7, 8.2, 7.8, 7.3, 7.0, 6.5,
+              6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.7, 1.5, 1.7,
+              2.2, 2.8, 3.3, 3.5, 3.2, 2.8, 2.2, 1.5, 1.0, 1.0],
+        "y": [5.5, 5.5, 5.9, 5.5, 5.0, 4.2, 3.5, 3.0, 2.7, 2.5, 2.3, 2.1,
+              1.9, 1.7, 1.5, 1.3, 1.1, 1.0, 0.9, 0.9, 1.0, 1.3, 1.8, 2.3,
+              2.8, 3.3, 3.8, 4.3, 4.8, 5.2, 5.5, 5.6, 5.6, 5.5],
+    },
+    "monaco": {
+        "name": "Circuit de Monaco",
+        # Clockwise. S/F bottom-left, Casino at top, Grand Hotel Hairpin on right.
+        # Tunnel goes through lower-right section.
+        "x": [1.5, 5.5, 6.0, 6.7, 7.5, 8.3, 8.8, 9.2, 9.5, 9.5, 9.3, 9.0,
+              9.0, 9.3, 9.5, 9.3, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5,
+              5.0, 4.5, 4.2, 4.5, 4.7, 4.5, 4.0, 3.5, 3.0, 2.5, 2.2, 1.8,
+              1.5, 1.5],
+        "y": [3.5, 3.5, 4.0, 5.0, 6.0, 7.0, 7.3, 7.0, 6.5, 6.0, 5.5, 5.0,
+              4.5, 4.0, 3.5, 3.0, 3.0, 3.2, 3.5, 3.3, 3.0, 2.8, 2.7, 2.8,
+              3.0, 3.2, 3.0, 2.7, 2.4, 2.1, 2.4, 2.7, 2.9, 3.1, 3.3, 3.4,
+              3.5, 3.5],
+    },
+    "silverstone": {
+        "name": "Silverstone Circuit",
+        # Clockwise. S/F at left, Maggotts-Becketts esses at top-right.
+        "x": [1.0, 7.0, 7.8, 8.5, 8.8, 8.5, 7.8, 7.3, 7.5, 8.0, 8.3, 8.0,
+              8.5, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0, 4.0, 3.0, 2.0,
+              1.5, 1.0, 0.8, 1.0, 1.0],
+        "y": [5.0, 5.0, 5.3, 5.8, 6.5, 7.0, 6.5, 6.2, 5.8, 5.5, 5.2, 4.8,
+              4.3, 3.5, 3.0, 2.5, 2.0, 1.5, 1.2, 1.0, 0.8, 0.8, 0.8, 1.0,
+              1.5, 2.5, 3.5, 4.5, 5.0],
+    },
+    "monza": {
+        "name": "Autodromo Nazionale Monza",
+        # Clockwise. S/F top-left. Oval with chicanes.
+        # Variante Rettifilo (top-right), Curve Grande, Roggia, Lesmos, Ascari, Parabolica.
+        "x": [2.0, 5.5, 6.3, 7.0, 6.7, 7.2, 7.8, 8.5, 9.0, 9.5, 9.5, 9.5,
+              9.2, 8.8, 8.5, 8.8, 9.0, 8.7, 8.3, 8.0, 7.5, 7.0, 6.5, 6.0,
+              5.5, 5.0, 4.5, 4.3, 4.5, 4.3, 3.8, 3.2, 2.5, 1.8, 1.3, 1.0,
+              1.5, 2.0, 2.0],
+        "y": [6.5, 6.5, 6.8, 6.5, 6.2, 6.5, 6.2, 5.8, 5.3, 4.8, 4.2, 3.6,
+              3.2, 3.0, 2.7, 2.5, 2.3, 2.0, 1.8, 2.0, 1.8, 1.5, 1.2, 1.0,
+              1.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.8, 5.5, 6.0, 6.3,
+              6.5, 6.5, 6.5],
+    },
+    "abudhabi": {
+        "name": "Yas Marina Circuit",
+        # Anti-clockwise. S/F at top-right, T1 hairpin at far left.
+        # Hotel section creates distinctive double-loop on the right side.
+        "x": [9.0, 2.0, 1.5, 1.5, 2.0, 3.0, 4.0, 5.0, 5.5, 5.5, 5.0, 4.5,
+              4.0, 3.5, 3.2, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0, 8.5, 9.0, 9.5,
+              9.8, 9.5, 9.0, 8.5, 9.0, 9.5, 9.8, 9.5, 9.0, 8.5, 8.0, 9.0,
+              9.0],
+        "y": [5.5, 5.5, 5.0, 4.5, 4.0, 3.5, 3.2, 3.0, 3.3, 2.8, 2.5, 2.2,
+              2.0, 1.7, 1.4, 1.1, 0.9, 0.8, 0.9, 1.1, 1.5, 2.0, 2.8, 3.5,
+              4.2, 4.8, 5.0, 5.2, 5.5, 5.8, 6.2, 6.5, 6.3, 6.0, 5.8, 5.8,
+              5.5],
+    },
 }
+CIRCUIT_PATHS["abu_dhabi"] = CIRCUIT_PATHS["abudhabi"]
 
 
-def _get_circuit_coords(race_slug: str) -> dict | None:
-    for key in CIRCUIT_COORDS:
-        if key in race_slug.lower():
-            return CIRCUIT_COORDS[key]
-    return None
+def _render_circuit_map(race_slug: str):
+    """Return a Plotly figure with the circuit layout drawn from pre-defined waypoints."""
+    path_data = None
+    for key in CIRCUIT_PATHS:
+        if key in race_slug.lower() and CIRCUIT_PATHS[key] is not None:
+            path_data = CIRCUIT_PATHS[key]
+            break
+    if not path_data:
+        return None
+
+    import numpy as np
+    x_pts = list(path_data["x"])
+    y_pts = list(path_data["y"])
+
+    # Smooth path with cubic spline if scipy is available
+    try:
+        from scipy.interpolate import CubicSpline
+        t = np.linspace(0, 1, len(x_pts))
+        t_new = np.linspace(0, 1, 400)
+        x_s = CubicSpline(t, x_pts, bc_type="periodic" if x_pts[0] == x_pts[-1] else "not-a-knot")(t_new).tolist()
+        y_s = CubicSpline(t, y_pts, bc_type="periodic" if y_pts[0] == y_pts[-1] else "not-a-knot")(t_new).tolist()
+    except Exception:
+        x_s, y_s = x_pts, y_pts
+
+    # Axis ranges with padding
+    pad = 0.4
+    x_min, x_max = min(x_s) - pad, max(x_s) + pad
+    y_min, y_max = min(y_s) - pad, max(y_s) + pad
+
+    fig = go.Figure()
+
+    # Track outline
+    fig.add_trace(go.Scatter(
+        x=x_s, y=y_s,
+        mode="lines",
+        line=dict(color="#E8002D", width=5),
+        showlegend=False,
+        hoverinfo="skip",
+    ))
+
+    # S/F marker
+    fig.add_trace(go.Scatter(
+        x=[x_pts[0]], y=[y_pts[0]],
+        mode="markers+text",
+        marker=dict(size=10, color="white", symbol="square"),
+        text=["S/F"],
+        textposition="top right",
+        textfont=dict(color="white", size=11),
+        showlegend=False,
+        hoverinfo="skip",
+    ))
+
+    fig.update_layout(
+        paper_bgcolor="#0F0F0F",
+        plot_bgcolor="#0F0F0F",
+        xaxis=dict(visible=False, range=[x_min, x_max], scaleanchor="y", scaleratio=1),
+        yaxis=dict(visible=False, range=[y_min, y_max]),
+        margin=dict(l=10, r=10, t=45, b=10),
+        height=320,
+        title=dict(text=f"<b>{path_data['name']}</b>", font=dict(color="white", size=13), x=0.5),
+    )
+    return fig
 
 
 def _get_circuit_profile(race_slug: str) -> dict:
@@ -174,29 +288,11 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     mode_label = "Fan" if mode == "fan" else "Engineer"
     st.info(f"**{mode_label} Intel:** {granite_brief}")
 
-    # ── Circuit Map ────────────────────────────────────────────────────────────
-    coords = _get_circuit_coords(race_slug)
-    if coords:
-        st.subheader("Circuit Location")
-        fig_map = go.Figure(go.Scattermapbox(
-            lat=[coords["lat"]],
-            lon=[coords["lon"]],
-            mode="markers",
-            marker=dict(size=14, color="#FF8000"),
-            text=[coords["name"]],
-            hoverinfo="text",
-        ))
-        fig_map.update_layout(
-            mapbox=dict(
-                style="open-street-map",
-                center=dict(lat=coords["lat"], lon=coords["lon"]),
-                zoom=coords["zoom"],
-            ),
-            margin=dict(l=0, r=0, t=0, b=0),
-            height=350,
-            paper_bgcolor="#0F0F0F",
-        )
-        st.plotly_chart(fig_map, use_container_width=True)
+    # ── Circuit Layout Diagram ─────────────────────────────────────────────────
+    fig_circuit = _render_circuit_map(race_slug)
+    if fig_circuit:
+        st.subheader("Circuit Layout")
+        st.plotly_chart(fig_circuit, use_container_width=True)
 
     st.divider()
 

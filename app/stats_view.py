@@ -97,7 +97,8 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
     available = [d for d in DRIVERS if d in stats_df.index]
     col_a, col_b = st.columns(2)
     driver_a = col_a.selectbox("Driver A", options=available,
-                               index=0, key="h2h_a")
+                               index=available.index(selected_driver) if selected_driver in available else 0,
+                               key="h2h_a")
     driver_b = col_b.selectbox("Driver B", options=available,
                                index=min(1, len(available) - 1), key="h2h_b")
 

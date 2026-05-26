@@ -81,6 +81,22 @@ DRIVER_COLORS = {
     "NOR": "#FF8000", "RUS": "#27F4D2",
 }
 
+CIRCUIT_COORDS = {
+    "bahrain":     {"lat": 26.0325, "lon": 50.5106, "zoom": 13, "name": "Bahrain International Circuit"},
+    "monaco":      {"lat": 43.7347, "lon": 7.4206,  "zoom": 14, "name": "Circuit de Monaco"},
+    "silverstone": {"lat": 52.0786, "lon": -1.0169, "zoom": 13, "name": "Silverstone Circuit"},
+    "monza":       {"lat": 45.6156, "lon": 9.2811,  "zoom": 14, "name": "Autodromo Nazionale Monza"},
+    "abudhabi":    {"lat": 24.4672, "lon": 54.6031, "zoom": 13, "name": "Yas Marina Circuit"},
+    "abu_dhabi":   {"lat": 24.4672, "lon": 54.6031, "zoom": 13, "name": "Yas Marina Circuit"},
+}
+
+
+def _get_circuit_coords(race_slug: str) -> dict | None:
+    for key in CIRCUIT_COORDS:
+        if key in race_slug.lower():
+            return CIRCUIT_COORDS[key]
+    return None
+
 
 def _get_circuit_profile(race_slug: str) -> dict:
     for key in CIRCUIT_PROFILES:
@@ -157,6 +173,30 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     granite_brief = track_intel_brief(circuit, sector_dom_dict, mode)
     mode_label = "Fan" if mode == "fan" else "Engineer"
     st.info(f"**{mode_label} Intel:** {granite_brief}")
+
+    # ── Circuit Map ────────────────────────────────────────────────────────────
+    coords = _get_circuit_coords(race_slug)
+    if coords:
+        st.subheader("Circuit Location")
+        fig_map = go.Figure(go.Scattermapbox(
+            lat=[coords["lat"]],
+            lon=[coords["lon"]],
+            mode="markers",
+            marker=dict(size=14, color="#FF8000"),
+            text=[coords["name"]],
+            hoverinfo="text",
+        ))
+        fig_map.update_layout(
+            mapbox=dict(
+                style="open-street-map",
+                center=dict(lat=coords["lat"], lon=coords["lon"]),
+                zoom=coords["zoom"],
+            ),
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=350,
+            paper_bgcolor="#0F0F0F",
+        )
+        st.plotly_chart(fig_map, use_container_width=True)
 
     st.divider()
 

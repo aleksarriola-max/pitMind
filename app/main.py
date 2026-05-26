@@ -25,7 +25,15 @@ st.set_page_config(
 # Session state defaults
 # ---------------------------------------------------------------------------
 
+_APP_VERSION = "3.3"  # bump to force session state reset on redeploy
+
 def _init_state():
+    # Clear stale session state from old deployments
+    if st.session_state.get("_version") != _APP_VERSION:
+        for k in list(st.session_state.keys()):
+            del st.session_state[k]
+        st.session_state["_version"] = _APP_VERSION
+
     defaults = {
         "selected_race": "bahrain_2025",
         "selected_driver": "VER",
@@ -94,6 +102,7 @@ with st.sidebar:
     )
     if driver != st.session_state.selected_driver:
         st.session_state.selected_driver = driver
+        st.session_state["h2h_a"] = driver  # keep H2H in sync with sidebar driver
         st.rerun()
 
     st.divider()

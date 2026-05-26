@@ -122,7 +122,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                 fill="toself",
                 name=drv,
                 line=dict(color=color),
-                fillcolor=color.replace(")", ",0.15)").replace("rgb", "rgba") if color.startswith("rgb") else color + "26",
+                fillcolor=f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.15)" if color.startswith("#") else color.replace(")", ",0.15)").replace("rgb", "rgba"),
                 opacity=0.85,
             ))
 

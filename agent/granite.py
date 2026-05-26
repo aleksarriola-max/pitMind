@@ -19,6 +19,7 @@ import requests
 
 log = logging.getLogger(__name__)
 
+# Phase 3 — v3.1 (cache-bust: all narrative functions present)
 GRANITE_MODEL = "ibm/granite-4-h-small"
 IAM_TOKEN_URL = "https://iam.cloud.ibm.com/identity/token"
 CHAT_PATH = "/ml/v1/text/chat?version=2023-05-29"

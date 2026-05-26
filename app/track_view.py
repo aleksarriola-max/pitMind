@@ -7,8 +7,22 @@ import plotly.express as px
 import streamlit as st
 
 from models.race_forecast import forecast_positions, get_aggression_zone_stats
-from agent.granite import track_intel_brief, error_summary
-from models.error_detection import detect_pilot_errors, error_counts, total_errors
+
+try:
+    from agent.granite import track_intel_brief, error_summary
+except ImportError:
+    def track_intel_brief(circuit, sectors, mode="fan"):
+        return f"Track Intel: {circuit.get('track_character','')[:80]}. Granite narrative unavailable."
+    def error_summary(errors, driver, mode="fan"):
+        return f"{driver} incident summary unavailable — Granite not connected."
+
+try:
+    from models.error_detection import detect_pilot_errors, error_counts, total_errors
+except ImportError:
+    def detect_pilot_errors(df, flag_periods=None):
+        import pandas as pd; return pd.DataFrame(columns=["lap","driver","error_type","severity","signal_value","description"])
+    def error_counts(df): return {}
+    def total_errors(df, driver): return 0
 
 TEAM_COLORS = {
     "Red Bull Racing": "#3671C6",

@@ -6,8 +6,19 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data.ingest import DRIVERS
-from agent.granite import h2h_narrative
-from models.driver_stats import compute_season_stats, season_arc, rank_drivers
+
+try:
+    from agent.granite import h2h_narrative
+except ImportError:
+    def h2h_narrative(a, b, sa, sb, mode="fan"):
+        return f"Head-to-head comparison: {a} vs {b}. Granite narrative unavailable."
+
+try:
+    from models.driver_stats import compute_season_stats, season_arc, rank_drivers
+except ImportError:
+    def compute_season_stats(dfs): import pandas as pd; return pd.DataFrame()
+    def season_arc(dfs, driver): import pandas as pd; return pd.DataFrame()
+    def rank_drivers(df): return df
 
 DRIVER_COLORS = {
     "VER": "#3671C6", "HAM": "#E8002D", "LEC": "#E8002D",

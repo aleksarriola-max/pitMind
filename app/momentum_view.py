@@ -6,7 +6,18 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from data.ingest import DRIVERS
-from agent.granite import annotate_shift, race_narrative, driver_of_race
+
+try:
+    from agent.granite import annotate_shift, race_narrative, driver_of_race
+except ImportError:
+    def annotate_shift(shift, mode="fan"):
+        d = shift.get("driver", ""); lap = shift.get("lap", 0); mag = shift.get("magnitude", 0)
+        return f"Lap {lap}: {d} momentum shift of {mag:.0f} pts."
+    def race_narrative(shifts, flags, positions, race_name, mode="fan"):
+        winner = min(positions.items(), key=lambda x: x[1])[0] if positions else "?"
+        return f"{winner} won {race_name}. Full narrative unavailable — Granite API not connected."
+    def driver_of_race(driver, stats, mode="fan"):
+        return f"{driver} was the standout performer this race."
 
 TEAM_COLORS = {
     "Red Bull": "#3671C6",

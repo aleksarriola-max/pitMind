@@ -2,6 +2,7 @@
 
 > Bridging the gap between the pit wall and the grandstand — powered by IBM Granite AI
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B)](https://pitmind-bvihgej8qmkzrergphk4xb.streamlit.app/)
 [![IBM Granite](https://img.shields.io/badge/IBM-Granite%20AI-0043CE)](https://www.ibm.com/watsonx)
 [![Built with Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B)](https://streamlit.io)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://python.org)
@@ -241,6 +242,12 @@ This pulls fresh data from FastF1 + OpenF1, computes momentum scores and behavio
 4. IAM → Manage → API keys → Create API key
 5. Note your **project ID** (shown in the project URL)
 6. Add credentials to `.streamlit/secrets.toml` (see above)
+
+---
+
+## Demo Video
+
+▶ [Watch the 3-minute walkthrough](https://pitmind-bvihgej8qmkzrergphk4xb.streamlit.app/)
 
 ---
 

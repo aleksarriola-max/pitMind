@@ -233,6 +233,40 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
                     st.session_state.selected_driver = shift["driver"]
                     st.session_state.pit_decision = None
                     st.rerun()
+
+                # Causation detail expander
+                shift_drv_df = df[df["driver"] == shift["driver"]].sort_values("lap")
+                shift_lap = shift["lap"]
+                rows_at = shift_drv_df[shift_drv_df["lap"] == shift_lap]
+                rows_prev = shift_drv_df[shift_drv_df["lap"] == shift_lap - 1]
+                if len(rows_at) > 0 and len(rows_prev) > 0:
+                    r_now = rows_at.iloc[0]
+                    r_prev = rows_prev.iloc[0]
+                    SIGNAL_COLS = [
+                        ("gap_ahead",            "Gap Ahead (s)",     ".2f"),
+                        ("pace_delta",           "Pace Delta (s/lap)", "+.2f"),
+                        ("pit_window_pressure",  "Pit Pressure",      ".0f"),
+                        ("radio_sentiment",      "Radio Sentiment",   ".2f"),
+                        ("tyre_age",             "Tyre Age (laps)",   ".0f"),
+                    ]
+                    with st.expander(f"Signal changes at lap {shift_lap} — {shift['driver']}", expanded=False):
+                        sig_rows = []
+                        for col, label, fmt in SIGNAL_COLS:
+                            if col not in r_now.index:
+                                continue
+                            v_now = r_now[col]
+                            v_prev = r_prev[col]
+                            if pd.isna(v_now) or pd.isna(v_prev):
+                                continue
+                            delta = v_now - v_prev
+                            sig_rows.append({
+                                "Signal": label,
+                                "Lap −1": f"{v_prev:{fmt}}",
+                                "This Lap": f"{v_now:{fmt}}",
+                                "Δ": f"{delta:+.2f}",
+                            })
+                        if sig_rows:
+                            st.dataframe(pd.DataFrame(sig_rows), hide_index=True, use_container_width=True)
         else:
             st.info("No significant momentum shifts detected for the selected drivers.")
 

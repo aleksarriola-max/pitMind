@@ -214,6 +214,85 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
     else:
         shap_vals = {}
 
+    # Engineer-only telemetry trend charts
+    if mode == "engineer":
+        drv_all = df[df["driver"] == driver].sort_values("lap")
+
+        st.divider()
+        st.markdown("**Radio Sentiment Trend**")
+        sent = drv_all[["lap", "radio_sentiment"]].dropna()
+        if len(sent) > 0:
+            fig_sent = go.Figure(go.Scatter(
+                x=sent["lap"], y=sent["radio_sentiment"],
+                mode="lines", line=dict(color="#F59E0B", width=2),
+                fill="tozeroy", fillcolor="rgba(245,158,11,0.1)",
+                hovertemplate="Lap %{x}<br>Sentiment: %{y:.2f}<extra></extra>",
+            ))
+            fig_sent.add_hline(y=0, line=dict(color="#555555", dash="dot", width=1))
+            fig_sent.update_layout(
+                paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                font=dict(color="white"),
+                xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                yaxis=dict(title="Sentiment (−1 stress → +1 calm)", range=[-1.1, 1.1], gridcolor="#2A2A2A"),
+                height=200, margin=dict(l=60, r=20, t=10, b=40),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_sent, use_container_width=True)
+        else:
+            st.caption("Radio sentiment data unavailable.")
+
+        st.divider()
+        st.markdown("**Incident Risk Trend**")
+        risk = drv_all[["lap", "incident_risk"]].dropna()
+        if len(risk) > 0:
+            fig_risk = go.Figure(go.Scatter(
+                x=risk["lap"], y=risk["incident_risk"],
+                mode="lines", line=dict(color="#EF4444", width=2),
+                fill="tozeroy", fillcolor="rgba(239,68,68,0.1)",
+                hovertemplate="Lap %{x}<br>Risk: %{y:.2f}<extra></extra>",
+            ))
+            fig_risk.add_hline(y=0.5, line=dict(color="#EF4444", dash="dot", width=1),
+                               annotation_text="High Risk", annotation_position="right",
+                               annotation_font=dict(color="#EF4444", size=9))
+            fig_risk.update_layout(
+                paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                font=dict(color="white"),
+                xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                yaxis=dict(title="Incident Risk (0–1)", range=[0, 1], gridcolor="#2A2A2A"),
+                height=200, margin=dict(l=60, r=20, t=10, b=40),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_risk, use_container_width=True)
+        else:
+            st.caption("Incident risk data unavailable.")
+
+        st.divider()
+        st.markdown("**Prediction Probability Trends**")
+        trend_cols = [c for c in PRED_COLS if c in drv_all.columns]
+        if trend_cols:
+            fig_trend = go.Figure()
+            for col in trend_cols:
+                trend_data = drv_all[["lap", col]].dropna()
+                if len(trend_data) == 0:
+                    continue
+                fig_trend.add_trace(go.Scatter(
+                    x=trend_data["lap"], y=trend_data[col],
+                    mode="lines", name=PRED_LABELS.get(col, col),
+                    line=dict(color=PRED_COLORS.get(col, "#AAAAAA"), width=2),
+                    hovertemplate=f"{PRED_LABELS.get(col, col)}: %{{y:.0%}}<extra></extra>",
+                ))
+            fig_trend.update_layout(
+                paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                font=dict(color="white"),
+                xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                yaxis=dict(title="Probability", range=[0, 1], tickformat=".0%", gridcolor="#2A2A2A"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.01),
+                height=220, margin=dict(l=60, r=20, t=20, b=40),
+            )
+            st.plotly_chart(fig_trend, use_container_width=True)
+        else:
+            st.caption("Prediction trend data unavailable.")
+
     # Granite narrative
     st.divider()
     import json

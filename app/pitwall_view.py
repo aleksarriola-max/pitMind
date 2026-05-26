@@ -163,6 +163,19 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
         c7.metric("Safety Car", "🟡 Active" if sc_active else "✅ Clear")
         c8.metric("Position", f"P{pos}")
 
+        # Pit Strategy Optimizer
+        drv_full = df[df["driver"] == driver].sort_values("lap")
+        ahead_window = drv_full[(drv_full["lap"] >= lap) & (drv_full["lap"] <= lap + 15)]
+        if len(ahead_window) > 0 and "pit_window_pressure" in ahead_window.columns:
+            peak_idx = ahead_window["pit_window_pressure"].idxmax()
+            optimal_lap = int(ahead_window.loc[peak_idx, "lap"])
+            peak_pressure = int(ahead_window.loc[peak_idx, "pit_window_pressure"])
+            laps_to_optimal = optimal_lap - lap
+            if laps_to_optimal == 0:
+                st.warning(f"**Pit Strategy Model:** Pit **now** — window pressure peaks this lap ({peak_pressure}/100)")
+            else:
+                st.info(f"**Pit Strategy Model:** Optimal pit in **{laps_to_optimal} lap(s)** (lap {optimal_lap}) · pressure peaks at {peak_pressure}/100")
+
     # Granite brief
     lap_data = row.to_dict()
     lap_data["driver"] = driver
@@ -207,6 +220,42 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
         verdict_text = "✅ You called it!" if outcome["user_correct"] else "❌ The team disagreed."
         st.markdown(f"**{verdict_text}**")
         st.write(outcome["outcome_str"])
+
+        # Pit Accuracy Overlay (engineer only)
+        if mode == "engineer":
+            import plotly.graph_objects as _go
+            drv_all = df[df["driver"] == driver].sort_values("lap")
+            pw = drv_all[["lap", "pit_window_pressure"]].dropna()
+            if len(pw) > 0:
+                st.markdown("**Pit Window Pressure vs. Actual Pit Laps**")
+                actual_pit_laps = (
+                    drv_all[drv_all["is_pit_in"] == True]["lap"].tolist()
+                    if "is_pit_in" in drv_all.columns else []
+                )
+                fig_pw = _go.Figure()
+                fig_pw.add_trace(_go.Scatter(
+                    x=pw["lap"], y=pw["pit_window_pressure"],
+                    mode="lines", line=dict(color="#F59E0B", width=2),
+                    fill="tozeroy", fillcolor="rgba(245,158,11,0.08)",
+                    name="Pit Window Pressure",
+                    hovertemplate="Lap %{x}<br>Pressure: %{y}/100<extra></extra>",
+                ))
+                for pit_lap in actual_pit_laps:
+                    fig_pw.add_vline(
+                        x=pit_lap, line=dict(color="#22C55E", dash="solid", width=2),
+                        annotation_text=f"Pit L{int(pit_lap)}",
+                        annotation_position="top left",
+                        annotation_font=dict(color="#22C55E", size=9),
+                    )
+                fig_pw.update_layout(
+                    paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                    font=dict(color="white"),
+                    xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                    yaxis=dict(title="Pit Window Pressure (0–100)", range=[0, 105], gridcolor="#2A2A2A"),
+                    height=200, margin=dict(l=60, r=20, t=10, b=40),
+                    showlegend=False,
+                )
+                st.plotly_chart(fig_pw, use_container_width=True)
 
         # Driver Soul instinct card
         st.divider()

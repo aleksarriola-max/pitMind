@@ -25,7 +25,7 @@ st.set_page_config(
 # Session state defaults
 # ---------------------------------------------------------------------------
 
-_APP_VERSION = "3.3"  # bump to force session state reset on redeploy
+_APP_VERSION = "3.4"  # bump to force session state reset on redeploy
 
 def _init_state():
     # Clear stale session state from old deployments

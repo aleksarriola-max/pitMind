@@ -211,6 +211,43 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 st.plotly_chart(fig_shap, use_container_width=True)
         else:
             st.caption("SHAP values unavailable for this lap.")
+
+        # Model feature importance (global, from trained predictor)
+        st.divider()
+        st.markdown("**Model Feature Importance — Position Gain Predictor**")
+        try:
+            from models.driver_soul import load_models
+            _models = load_models()
+            _predictor = _models.get("predictor")
+            _feat_names = _models.get("feature_names", [])
+            if _predictor is not None and hasattr(_predictor, "estimators_") and _feat_names:
+                _importances = _predictor.estimators_[0].feature_importances_
+                _imp_pairs = sorted(zip(_feat_names, _importances), key=lambda x: x[1], reverse=True)[:10]
+                _labels = [p[0].replace("_", " ").title() for p in _imp_pairs]
+                _vals = [p[1] for p in _imp_pairs]
+                _fig_imp = go.Figure(go.Bar(
+                    x=_vals,
+                    y=_labels,
+                    orientation="h",
+                    marker=dict(color="#3671C6", opacity=0.85),
+                    text=[f"{v:.3f}" for v in _vals],
+                    textposition="outside",
+                ))
+                _fig_imp.update_layout(
+                    paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                    font=dict(color="white"),
+                    xaxis=dict(title="Feature Importance", gridcolor="#2A2A2A"),
+                    yaxis=dict(gridcolor="#2A2A2A"),
+                    showlegend=False,
+                    height=280,
+                    margin=dict(l=160, r=60, t=10, b=40),
+                )
+                st.plotly_chart(_fig_imp, use_container_width=True)
+                st.caption("Global XGBoost feature importances for the position gain prediction model")
+            else:
+                st.caption("Feature importance unavailable.")
+        except Exception:
+            st.caption("Feature importance unavailable.")
     else:
         shap_vals = {}
 

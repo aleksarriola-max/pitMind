@@ -169,6 +169,36 @@ def _system_prompt(mode: str) -> str:
 # Public functions
 # ---------------------------------------------------------------------------
 
+def granite_health_check() -> tuple[bool, str]:
+    """Quick ping to verify IBM Watsonx is reachable. Returns (ok, message)."""
+    import time
+    try:
+        api_key, project_id, watsonx_url = _get_credentials()
+        if not api_key or not project_id:
+            return False, "IAM token unavailable"
+        token = _get_iam_token(api_key)
+        if not token:
+            return False, "IAM token unavailable"
+        start = time.time()
+        resp = requests.post(
+            f"{watsonx_url}/ml/v1/text/chat?version=2024-05-01",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={
+                "model_id": "ibm/granite-4-h-small",
+                "project_id": project_id,
+                "messages": [{"role": "user", "content": "ok"}],
+                "parameters": {"max_new_tokens": 3},
+            },
+            timeout=5,
+        )
+        latency_ms = int((time.time() - start) * 1000)
+        if resp.status_code == 200:
+            return True, f"{latency_ms}ms"
+        return False, f"HTTP {resp.status_code}"
+    except Exception as e:
+        return False, str(e)[:40]
+
+
 def annotate_shift(shift: dict, mode: str = "fan") -> str:
     """
     One-sentence annotation for a momentum shift on the chart.

@@ -564,17 +564,35 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                     vals = pd.to_numeric(drv_data[col], errors="coerce")
                     if vals.isna().all():
                         continue
+                    vals_smooth = vals.rolling(3, min_periods=1).mean()
+                    # Raw (faint background)
                     fig_sec.add_trace(go.Scatter(
                         x=drv_data["lap"],
                         y=vals,
+                        name=f"{drv} {sector_labels.get(col, col)} (raw)",
+                        mode="lines",
+                        line=dict(
+                            color=color,
+                            width=1,
+                            dash="solid" if col == "sector1_time" else ("dash" if col == "sector2_time" else "dot"),
+                        ),
+                        opacity=0.25,
+                        showlegend=False,
+                        hoverinfo="skip",
+                    ))
+                    # Smoothed (3-lap rolling avg)
+                    fig_sec.add_trace(go.Scatter(
+                        x=drv_data["lap"],
+                        y=vals_smooth,
                         name=f"{drv} {sector_labels.get(col, col)}",
                         mode="lines",
                         line=dict(
                             color=color,
-                            width=2,
+                            width=2.5,
                             dash="solid" if col == "sector1_time" else ("dash" if col == "sector2_time" else "dot"),
                         ),
-                        hovertemplate=f"{drv} {sector_labels.get(col, col)}: %{{y:.3f}}s · Lap %{{x}}<extra></extra>",
+                        opacity=0.9,
+                        hovertemplate=f"{drv} {sector_labels.get(col, col)} (3-lap avg): %{{y:.3f}}s · Lap %{{x}}<extra></extra>",
                     ))
             fig_sec.update_layout(
                 paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
@@ -585,8 +603,16 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                 height=300,
                 margin=dict(l=50, r=20, t=20, b=40),
             )
+            # Overlay SC laps as grey bands
+            if "safety_car_active" in df.columns:
+                sc_laps = sorted(df[df["safety_car_active"] == True]["lap"].unique())
+                for sc_lap in sc_laps:
+                    fig_sec.add_vrect(
+                        x0=sc_lap - 0.5, x1=sc_lap + 0.5,
+                        fillcolor="rgba(200,200,200,0.1)", line_width=0,
+                    )
             st.plotly_chart(fig_sec, use_container_width=True)
-            st.caption("Solid = S1 · Dashed = S2 · Dotted = S3")
+            st.caption("Solid = S1 · Dashed = S2 · Dotted = S3 · Faint = raw · Bold = 3-lap avg · Grey bands = SC")
         elif drv_a == drv_b:
             st.info("Select two different drivers to compare sector times.")
 

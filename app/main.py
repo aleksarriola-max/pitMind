@@ -48,6 +48,20 @@ def _init_state():
 
 _init_state()
 
+# Restore state from URL query params (enables shareable links)
+_qp = st.query_params
+if "race" in _qp and _qp["race"] in RACES:
+    st.session_state.setdefault("selected_race", _qp["race"])
+    if st.session_state.get("selected_race") != _qp["race"]:
+        st.session_state.selected_race = _qp["race"]
+if "driver" in _qp and _qp["driver"] in DRIVERS:
+    st.session_state.setdefault("selected_driver", _qp["driver"])
+if "lap" in _qp:
+    try:
+        st.session_state.setdefault("selected_lap", int(_qp["lap"]))
+    except ValueError:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Data loading (cached)
@@ -141,6 +155,13 @@ with st.sidebar:
             st.session_state.pit_decision = None
             st.rerun()
 
+    # Sync state to URL for shareable links
+    st.query_params.update({
+        "race": st.session_state.selected_race,
+        "driver": st.session_state.selected_driver,
+        "lap": str(st.session_state.selected_lap),
+    })
+
     st.divider()
     st.caption("Built with FastF1 · OpenF1 · IBM Granite · scikit-learn · XGBoost · SHAP")
 
@@ -149,6 +170,18 @@ with st.sidebar:
     st.sidebar.caption("🏎 5 races · 8 drivers · 2025 season")
     st.sidebar.caption("🤖 IBM Granite AI · XGBoost · SHAP")
     st.sidebar.caption("📡 FastF1 + OpenF1 · Whisper sentiment")
+
+    st.sidebar.divider()
+    with st.sidebar.expander("🤖 Granite API Status", expanded=False):
+        if st.button("Check connection", key="granite_ping"):
+            from agent.granite import granite_health_check
+            ok, msg = granite_health_check()
+            if ok:
+                st.success(f"✅ Connected · {msg}")
+            else:
+                st.error(f"❌ Unavailable · {msg}")
+        st.caption("IBM Watsonx · granite-4-h-small")
+        st.caption("Responses cached to reduce API calls")
 
 
 # ---------------------------------------------------------------------------

@@ -291,3 +291,35 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                     st.caption(f"**{drv_a}** leads {wins_a} metrics · **{drv_b}** leads {wins_b} metrics · Overall edge: **{overall}**")
 
                 st.markdown("")
+
+    # ── Data Export ───────────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("### Export Race Data")
+    st.caption("Download the underlying season statistics as CSV for your own analysis")
+
+    if len(stats_df) > 0:
+        export_df = stats_df.reset_index()
+        csv_bytes = export_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇ Download Season Stats (CSV)",
+            data=csv_bytes,
+            file_name="pitmind_season_stats_2025.csv",
+            mime="text/csv",
+            help="Exports all driver metrics across the 2025 season",
+        )
+
+    # Export individual race data
+    if all_race_dfs:
+        race_options = list(all_race_dfs.keys())
+        export_race = st.selectbox("Export individual race data", race_options, key="export_race_select")
+        if export_race and export_race in all_race_dfs:
+            race_df_export = all_race_dfs[export_race]
+            if len(race_df_export) > 0:
+                race_csv = race_df_export.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label=f"⬇ Download {export_race} race data (CSV)",
+                    data=race_csv,
+                    file_name=f"pitmind_{export_race.lower().replace(' ', '_')}.csv",
+                    mime="text/csv",
+                    help=f"Full per-lap telemetry data for {export_race}",
+                )

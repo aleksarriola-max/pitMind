@@ -293,6 +293,62 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
         else:
             st.caption("Prediction trend data unavailable.")
 
+        # What would another driver do?
+        st.divider()
+        st.markdown("**What would another driver do in this situation?**")
+        st.caption("Applies a different driver's behavioral model to the current lap context")
+
+        other_drivers = [d for d in df["driver"].unique() if d != driver]
+        if other_drivers:
+            compare_driver = st.selectbox(
+                "Compare with", other_drivers, key="soul_compare_driver"
+            )
+            compare_state = get_lap_state(df, compare_driver, lap)
+
+            if compare_state and lap_state:
+                # Side-by-side prediction comparison
+                st.markdown(f"*{driver} vs {compare_driver} — predictions at lap {lap}*")
+                cmp_cols = st.columns(len(PRED_COLS))
+                for col, pred in zip(cmp_cols, PRED_COLS):
+                    v_a = lap_state.get(pred, 0)
+                    v_b = compare_state.get(pred, 0)
+                    label = PRED_LABELS.get(pred, pred)
+                    delta = v_b - v_a
+                    col.metric(
+                        label,
+                        f"{v_a:.0%}",
+                        f"{compare_driver}: {v_b:.0%} ({delta:+.0%})",
+                        delta_color="inverse" if pred in ("position_loss_prob", "incident_risk") else "normal",
+                    )
+
+                # Pit decision comparison — the key insight
+                pit_a = lap_state.get("pit_prob", 0.5)
+                pit_b = compare_state.get("pit_prob", 0.5)
+                st.markdown("---")
+                insight_col1, insight_col2 = st.columns(2)
+                insight_col1.metric(
+                    f"{driver} pit probability",
+                    f"{pit_a:.0%}",
+                    "Would pit" if pit_a > 0.5 else "Would stay",
+                    delta_color="off",
+                )
+                insight_col2.metric(
+                    f"{compare_driver} pit probability",
+                    f"{pit_b:.0%}",
+                    "Would pit" if pit_b > 0.5 else "Would stay",
+                    delta_color="off",
+                )
+                if abs(pit_a - pit_b) > 0.15:
+                    diff_pct = abs(pit_a - pit_b)
+                    more_likely = driver if pit_a > pit_b else compare_driver
+                    less_likely = compare_driver if pit_a > pit_b else driver
+                    st.info(
+                        f"**{more_likely}** is **{diff_pct:.0%} more likely to pit** at this moment "
+                        f"than **{less_likely}** — their behavioral profiles diverge significantly here."
+                    )
+            else:
+                st.caption(f"No data for {compare_driver} at lap {lap}.")
+
     # Granite narrative
     st.divider()
     import json

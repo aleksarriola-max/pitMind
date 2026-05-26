@@ -229,3 +229,65 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
         with col:
             st.caption(metric_labels.get(metric, metric))
             st.plotly_chart(fig_arc, use_container_width=True)
+
+    # ── Section 4: Intra-Team Comparison ──────────────────────────────────────
+    if mode == "engineer":
+        st.divider()
+        st.markdown("### Intra-Team Comparison")
+        st.caption("Head-to-head between teammates across the 2025 season")
+
+        # Build team → [drivers in stats_df] mapping
+        DRIVER_TO_TEAM = {
+            "VER": "Red Bull",    "PER": "Red Bull",
+            "HAM": "Ferrari",     "LEC": "Ferrari",
+            "SAI": "Williams",    "RUS": "Mercedes",
+            "NOR": "McLaren",     "ALO": "Aston Martin",
+        }
+        from collections import defaultdict
+        team_map = defaultdict(list)
+        for drv in stats_df.index:
+            team = DRIVER_TO_TEAM.get(drv)
+            if team:
+                team_map[team].append(drv)
+
+        teammate_pairs = [(team, drivers) for team, drivers in team_map.items() if len(drivers) >= 2]
+
+        if not teammate_pairs:
+            st.info("No intra-team data available — need at least 2 teammates in the dataset.")
+        else:
+            for team, drivers in teammate_pairs:
+                st.markdown(f"**{team} — {' vs '.join(drivers)}**")
+                drv_a, drv_b = drivers[0], drivers[1]
+
+                rows = []
+                for col, (label, lower_better) in LEADERBOARD_METRICS.items():
+                    if col not in stats_df.columns:
+                        continue
+                    va = stats_df.loc[drv_a, col] if drv_a in stats_df.index else None
+                    vb = stats_df.loc[drv_b, col] if drv_b in stats_df.index else None
+                    if pd.isna(va) or pd.isna(vb):
+                        continue
+                    if lower_better:
+                        winner = drv_a if va < vb else drv_b
+                        edge = abs(float(va) - float(vb))
+                    else:
+                        winner = drv_a if va > vb else drv_b
+                        edge = abs(float(va) - float(vb))
+                    rows.append({
+                        "Metric": label,
+                        drv_a: f"{float(va):.1f}",
+                        drv_b: f"{float(vb):.1f}",
+                        "Edge": f"{winner} +{edge:.1f}",
+                    })
+
+                if rows:
+                    team_df = pd.DataFrame(rows)
+                    st.dataframe(team_df, use_container_width=True, hide_index=True)
+
+                    # Win count summary
+                    wins_a = sum(1 for r in rows if r["Edge"].startswith(drv_a))
+                    wins_b = sum(1 for r in rows if r["Edge"].startswith(drv_b))
+                    overall = drv_a if wins_a >= wins_b else drv_b
+                    st.caption(f"**{drv_a}** leads {wins_a} metrics · **{drv_b}** leads {wins_b} metrics · Overall edge: **{overall}**")
+
+                st.markdown("")

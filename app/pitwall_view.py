@@ -178,10 +178,19 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
 
         # Compound What-If
         st.markdown("**Strategy Scenarios — If You Pit Now**")
+
+        # Compute data-derived pace boost per compound from fresh-tyre laps
+        _fresh = df[(df["tyre_age"] <= 5) & (df["pace_delta"].notna())]
+        _pace_by_compound = _fresh.groupby("tyre_compound")["pace_delta"].median().to_dict()
+        _current_compound_pace = _pace_by_compound.get(compound, pace_delta)
+        def _boost(cmp):
+            base = _pace_by_compound.get(cmp, 0.0)
+            return float(base - _current_compound_pace)
+
         COMPOUND_PARAMS = {
-            "SOFT":   {"color": "🔴", "stint_laps": 18, "pace_boost": -0.35, "label": "Soft"},
-            "MEDIUM": {"color": "🟡", "stint_laps": 28, "pace_boost": -0.15, "label": "Medium"},
-            "HARD":   {"color": "⚪", "stint_laps": 40, "pace_boost":  0.05, "label": "Hard"},
+            "SOFT":   {"color": "🔴", "stint_laps": 18, "pace_boost": _boost("SOFT"),   "label": "Soft"},
+            "MEDIUM": {"color": "🟡", "stint_laps": 28, "pace_boost": _boost("MEDIUM"), "label": "Medium"},
+            "HARD":   {"color": "⚪", "stint_laps": 40, "pace_boost": _boost("HARD"),   "label": "Hard"},
         }
         wf_cols = st.columns(3)
         for i, (cmp, params) in enumerate(COMPOUND_PARAMS.items()):
@@ -200,12 +209,38 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 else:
                     at_risk = False
 
+                if pd.notna(gap_behind) and pd.notna(pace_delta) and pace_delta > 0:
+                    pace_diff = pace_delta - fresh_delta
+                    undercut_prob = min(100, max(0, int((pace_diff / max(gap_behind, 0.1)) * 100)))
+                else:
+                    undercut_prob = 0
+
                 verdict = "✅ Undercut" if can_undercut else ("⚠️ Risky" if at_risk else "↔ Neutral")
                 st.metric(
                     f"{params['color']} {params['label']}",
                     verdict,
-                    f"~{params['stint_laps']} lap stint · {fresh_delta:+.2f}s/lap",
+                    f"~{params['stint_laps']}L · {fresh_delta:+.2f}s · {undercut_prob}% undercut",
                 )
+
+        # Proactive alerts
+        alerts = []
+        if pressure >= 80:
+            alerts.append(("🚨 Critical pit window", f"Pressure at {pit_pressure_pct}/100 — team is calling it now", "error"))
+        elif pressure >= 65:
+            alerts.append(("⚠️ Pit window opening", f"Pressure at {pit_pressure_pct}/100 — monitor closely", "warning"))
+        if tyre_age >= 35:
+            alerts.append(("🔥 Tyre life critical", f"{tyre_age} laps on {compound} — pace drop imminent", "error"))
+        elif tyre_age >= 25:
+            alerts.append(("⚠️ Tyre wear elevated", f"{tyre_age} laps on {compound}", "warning"))
+        if sc_active:
+            alerts.append(("🟡 Safety Car opportunity", "Free pit stop window — pit cost near zero", "warning"))
+        if pd.notna(gap_ahead) and gap_ahead < 1.0:
+            alerts.append(("⚡ DRS range", f"Only {gap_ahead:.2f}s to car ahead — overtake or defend", "warning"))
+        for title, msg, level in alerts:
+            if level == "error":
+                st.error(f"**{title}** — {msg}")
+            else:
+                st.warning(f"**{title}** — {msg}")
 
     # Granite brief
     lap_data = row.to_dict()
@@ -348,7 +383,24 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
             "track_temp_c": f"{weather:.0f}" if pd.notna(weather) else "N/A",
         }
 
+        # Suggested questions (shown when chat is empty)
+        if not st.session_state.pitwall_chat_history:
+            st.caption("Quick questions:")
+            _suggestions = [
+                "Should I pit now?",
+                "What's my undercut risk?",
+                "How are my tyres holding up vs the field?",
+            ]
+            _sq_cols = st.columns(3)
+            for _i, (_col, _sug) in enumerate(zip(_sq_cols, _suggestions)):
+                if _col.button(_sug, key=f"_sq_{_i}"):
+                    st.session_state["_pitwall_prefill"] = _sug
+                    st.rerun()
+
         question = st.chat_input("e.g. Should I pit now? How are the tyres holding up?")
+        # Handle prefilled question from suggestion button
+        if not question and st.session_state.get("_pitwall_prefill"):
+            question = st.session_state.pop("_pitwall_prefill")
         if question:
             st.session_state.pitwall_chat_history.append({"role": "user", "content": question})
             with st.chat_message("user"):

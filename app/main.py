@@ -144,6 +144,12 @@ with st.sidebar:
     st.divider()
     st.caption("Built with FastF1 · OpenF1 · IBM Granite · scikit-learn · XGBoost · SHAP")
 
+    st.sidebar.divider()
+    st.sidebar.caption("**PitMind Coverage**")
+    st.sidebar.caption("🏎 5 races · 8 drivers · 2025 season")
+    st.sidebar.caption("🤖 IBM Granite AI · XGBoost · SHAP")
+    st.sidebar.caption("📡 FastF1 + OpenF1 · Whisper sentiment")
+
 
 # ---------------------------------------------------------------------------
 # Main tabs

@@ -80,6 +80,37 @@ FastF1 (official F1 library)    OpenF1 API (real-time)
 
 **5 races, 2025 season:** Bahrain, Monaco, Silverstone, Monza, Abu Dhabi
 
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        DATA LAYER                                │
+│  FastF1 (telemetry) + OpenF1 (live) + Whisper (radio audio)     │
+│  → 30-column per-lap DataFrame → .parquet cache (sub-second load)│
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│                       MODEL LAYER                                │
+│  Momentum: pace Δ + gap + sentiment + pit pressure → 0–100      │
+│  Driver Soul: 11 traits → UMAP fingerprint → XGBoost 4-target   │
+│  Error Detection: 5-type incident classifier                     │
+│  Race Forecast: gap + pace Δ → 15-lap position projection        │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│                        AI LAYER (IBM Granite)                    │
+│  granite-4-h-small · 9 functions · dual system prompts          │
+│  Fan voice ←→ Engineer voice from same model + same data        │
+│  Conversational chat interface with lap telemetry context        │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────┐
+│                    PRESENTATION LAYER                            │
+│  Streamlit · 5 tabs · Fan / Engineer mode toggle                │
+│  Plotly charts · Real-time pit decisions · Live GPS positions    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### Machine Learning Stack
 
 ```

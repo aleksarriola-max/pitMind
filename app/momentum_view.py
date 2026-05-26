@@ -211,6 +211,39 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
         if legend_parts:
             st.caption("Flag periods: " + " · ".join(legend_parts))
 
+    # DRS usage mini-chart
+    if "drs_used" in df.columns:
+        drs_df = df[df["driver"].isin(selected_drivers)].copy()
+        drs_df["drs_int"] = drs_df["drs_used"].astype(float).fillna(0)
+        if drs_df["drs_int"].sum() > 0:
+            fig_drs = go.Figure()
+            for driver in selected_drivers:
+                d = drs_df[drs_df["driver"] == driver]
+                team = DRIVER_TEAMS.get(driver, "")
+                color = TEAM_COLORS.get(team, "#AAAAAA")
+                drs_laps = d[d["drs_int"] > 0]["lap"].tolist()
+                if not drs_laps:
+                    continue
+                fig_drs.add_trace(go.Scatter(
+                    x=drs_laps,
+                    y=[driver] * len(drs_laps),
+                    mode="markers",
+                    marker=dict(color=color, size=6, symbol="square"),
+                    name=driver,
+                    hovertemplate=f"<b>{driver}</b> DRS · Lap %{{x}}<extra></extra>",
+                ))
+            fig_drs.update_layout(
+                paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                font=dict(color="white"),
+                xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                yaxis=dict(title="", gridcolor="#2A2A2A"),
+                height=130,
+                margin=dict(l=60, r=20, t=10, b=30),
+                showlegend=False,
+            )
+            st.caption("DRS usage per lap")
+            st.plotly_chart(fig_drs, use_container_width=True)
+
     st.divider()
 
     # ── Shift detail panel (engineer only) ─────────────────────────────────────
@@ -275,6 +308,43 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
     # ── Race Narrative AI cards ─────────────────────────────────────────────────
     st.subheader("Race Intelligence")
     mode_label = "Fan" if mode == "fan" else "Engineer"
+
+    # Fan Pit Prediction Game
+    if mode == "fan":
+        with st.expander("🎯 Predict the Next Pit Stop", expanded=True):
+            current_lap = st.session_state.get("selected_lap", int(df["lap"].median()))
+
+            # Find the next actual pit stop after current_lap
+            future_pits = df[(df["lap"] > current_lap) & (df["is_pit_in"] == True)].sort_values("lap")
+
+            if len(future_pits) == 0:
+                st.info("No more pit stops detected in race data after this lap.")
+            else:
+                actual_pit_row = future_pits.iloc[0]
+                actual_driver = actual_pit_row["driver"]
+                actual_lap = int(actual_pit_row["lap"])
+
+                st.markdown(f"**Who makes the next pit stop after lap {current_lap}?**")
+
+                pred_key = f"pit_pred_{current_lap}"
+                if st.session_state.get(pred_key) is None:
+                    # Show prediction buttons (all available drivers)
+                    pred_drivers = [d for d in DRIVERS if d in df["driver"].unique()][:4]
+                    pred_cols = st.columns(len(pred_drivers))
+                    for col, drv in zip(pred_cols, pred_drivers):
+                        if col.button(drv, key=f"pred_btn_{drv}_{current_lap}", use_container_width=True):
+                            st.session_state[pred_key] = drv
+                            st.rerun()
+                else:
+                    guess = st.session_state[pred_key]
+                    correct = guess == actual_driver
+                    if correct:
+                        st.success(f"✅ Correct! **{actual_driver}** pitted on lap {actual_lap}.")
+                    else:
+                        st.error(f"❌ You picked {guess} — **{actual_driver}** actually pitted on lap {actual_lap}.")
+                    if st.button("Try another lap →", key=f"pred_reset_{current_lap}"):
+                        st.session_state[pred_key] = None
+                        st.rerun()
 
     # Card 1 — Explain This Race
     with st.expander("📖 Explain This Race", expanded=False):

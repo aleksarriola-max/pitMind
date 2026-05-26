@@ -244,7 +244,26 @@ def _position_on_path(x_s: list, y_s: list, fraction: float) -> tuple:
     return float(xs[idx] + t * dx[idx]), float(ys[idx] + t * dy[idx])
 
 
-def _render_circuit_map(race_slug: str, lap_df=None):
+def _detect_overtakes(df: pd.DataFrame) -> list:
+    """Return list of {driver, lap, position_before, position_after} for position gains."""
+    events = []
+    for driver, grp in df.groupby("driver"):
+        grp = grp.sort_values("lap")
+        pos = pd.to_numeric(grp["position"], errors="coerce")
+        laps = grp["lap"].values
+        for i in range(1, len(pos)):
+            if pd.notna(pos.iloc[i]) and pd.notna(pos.iloc[i-1]):
+                if pos.iloc[i] < pos.iloc[i-1]:  # gained position
+                    events.append({
+                        "driver": driver,
+                        "lap": int(laps[i]),
+                        "position_before": int(pos.iloc[i-1]),
+                        "position_after": int(pos.iloc[i]),
+                    })
+    return events
+
+
+def _render_circuit_map(race_slug: str, lap_df=None, overtake_events=None):
     """Return a Plotly figure with the circuit layout and optional driver position dots."""
     path_data = None
     for key in CIRCUIT_PATHS:
@@ -360,6 +379,29 @@ def _render_circuit_map(race_slug: str, lap_df=None):
                 hoverinfo="text",
             ))
 
+    # Overtake location markers
+    if overtake_events:
+        for ev in overtake_events[:20]:  # cap at 20 to avoid clutter
+            # Place marker at ~1/3 of the lap (sector 1 area, where overtakes often happen)
+            frac = (ev["position_after"] / 8) * 0.6  # spread by position
+            ox, oy = _position_on_path(x_s, y_s, frac)
+            driver_color = DRIVER_COLORS.get(ev["driver"], "#22C55E")
+            fig.add_trace(go.Scatter(
+                x=[ox], y=[oy],
+                mode="markers",
+                marker=dict(
+                    size=8,
+                    color=driver_color,
+                    symbol="triangle-up",
+                    line=dict(color="white", width=1),
+                    opacity=0.7,
+                ),
+                name=f"Overtake L{ev['lap']}",
+                showlegend=False,
+                hovertext=f"Overtake · {ev['driver']} · Lap {ev['lap']} · P{ev['position_before']}→P{ev['position_after']}",
+                hoverinfo="text",
+            ))
+
     fig.update_layout(
         paper_bgcolor="#0F0F0F",
         plot_bgcolor="#0F0F0F",
@@ -455,7 +497,8 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
 
     # ── Circuit Layout Diagram ─────────────────────────────────────────────────
     lap_df = df[df["lap"] == lap].copy() if "lap" in df.columns else pd.DataFrame()
-    fig_circuit = _render_circuit_map(race_slug, lap_df=lap_df)
+    overtake_events = _detect_overtakes(df) if len(df) > 0 else []
+    fig_circuit = _render_circuit_map(race_slug, lap_df=lap_df, overtake_events=overtake_events)
     if fig_circuit:
         st.subheader("Circuit Layout")
         st.plotly_chart(fig_circuit, use_container_width=True)

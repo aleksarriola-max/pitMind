@@ -384,6 +384,23 @@ def reveal_outcome(
         )
 
 
+def pitwall_chat(question: str, lap_context: dict, driver: str, mode: str) -> str:
+    """Answer a free-text engineer question about the current lap situation."""
+    ctx_lines = []
+    for k, v in lap_context.items():
+        if v is not None and str(v) != "nan":
+            ctx_lines.append(f"  {k}: {v}")
+    context_str = "\n".join(ctx_lines)
+
+    user_prompt = (
+        f"Driver: {driver}\n"
+        f"Current lap telemetry:\n{context_str}\n\n"
+        f"Question: {question}"
+    )
+    system_prompt = ENGINEER_SYSTEM_PROMPT if mode == "engineer" else FAN_SYSTEM_PROMPT
+    return _call_granite(user_prompt, system_prompt)
+
+
 def error_summary(error_log: list, driver: str, mode: str = "fan") -> str:
     """
     Narrative summary of a driver's incident log for the Pilot Error section.
@@ -469,7 +486,7 @@ def race_narrative(
     if mode == "fan":
         return (
             f"{winner} took the victory in {race_name}.{sc_note} "
-            f"The race hinged on momentum swings at {', '.join(f'lap {s.get(\"lap\")}' for s in top_shifts[:3])}. "
+            f"The race hinged on momentum swings at {', '.join('lap ' + str(s.get('lap')) for s in top_shifts[:3])}. "
             f"It was a race decided by strategy, nerve, and tyre management."
         )
     else:

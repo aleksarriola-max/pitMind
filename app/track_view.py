@@ -81,6 +81,86 @@ DRIVER_COLORS = {
     "NOR": "#FF8000", "RUS": "#27F4D2",
 }
 
+DRIVER_NUMBERS = {
+    "VER": 1, "HAM": 44, "LEC": 16, "SAI": 55,
+    "NOR": 4, "ALO": 14, "RUS": 63, "PER": 11,
+}
+
+# Module-level cache for OpenF1 session keys (slug → int)
+_track_session_key_cache: dict = {}
+
+
+def _get_session_key_for_slug(race_slug: str) -> int | None:
+    """Resolve OpenF1 session_key for a race slug via the /sessions endpoint."""
+    if race_slug in _track_session_key_cache:
+        return _track_session_key_cache[race_slug]
+
+    # Map slug to year + circuit short name using the same RACES dict structure
+    _SLUG_META = {
+        "bahrain_2025":     {"year": 2025, "circuit": "bahrain"},
+        "monaco_2025":      {"year": 2025, "circuit": "monaco"},
+        "silverstone_2025": {"year": 2025, "circuit": "silverstone"},
+        "monza_2025":       {"year": 2025, "circuit": "monza"},
+        "abudhabi_2025":    {"year": 2025, "circuit": "abu_dhabi"},
+    }
+
+    meta = None
+    for key, val in _SLUG_META.items():
+        if key in race_slug or race_slug in key:
+            meta = val
+            break
+    if meta is None:
+        return None
+
+    try:
+        import requests as _req
+        resp = _req.get(
+            "https://api.openf1.org/v1/sessions",
+            params={"year": meta["year"], "session_name": "Race"},
+            timeout=6,
+        )
+        if resp.status_code != 200:
+            return None
+        for s in resp.json():
+            key_name = s.get("circuit_short_name", "").lower().replace("-", "_").replace(" ", "_")
+            circuit = meta["circuit"].lower()
+            if circuit in key_name or key_name in circuit:
+                sk = s.get("session_key")
+                if sk:
+                    _track_session_key_cache[race_slug] = int(sk)
+                    return int(sk)
+    except Exception:
+        pass
+    return None
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _fetch_gps_positions(session_key: int, driver_codes: tuple) -> dict:
+    """Fetch latest GPS x/y for each driver from OpenF1 /location. Returns {driver: (x, y)} or {}."""
+    import requests
+    positions = {}
+    for code in driver_codes:
+        num = DRIVER_NUMBERS.get(code)
+        if num is None:
+            continue
+        try:
+            r = requests.get(
+                "https://api.openf1.org/v1/location",
+                params={"session_key": session_key, "driver_number": num},
+                timeout=4,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data:
+                    last = data[-1]
+                    x_val = last.get("x")
+                    y_val = last.get("y")
+                    if x_val is not None and y_val is not None:
+                        positions[code] = (float(x_val), float(y_val))
+        except Exception:
+            pass
+    return positions
+
 # Hand-crafted circuit path waypoints (x, y normalized).
 # Each path is closed (first == last point), traced in racing direction.
 CIRCUIT_PATHS = {
@@ -218,30 +298,65 @@ def _render_circuit_map(race_slug: str, lap_df=None):
     # Driver position dots for this lap
     if lap_df is not None and len(lap_df) > 0 and "position" in lap_df.columns:
         lap_sorted = lap_df.dropna(subset=["position"]).sort_values("position").head(8)
+        driver_codes = tuple(lap_sorted["driver"].astype(str).tolist())
+
+        # --- Attempt real GPS positions from OpenF1 ---
+        gps_positions: dict = {}
+        try:
+            session_key = _get_session_key_for_slug(race_slug)
+            if session_key is not None:
+                raw_gps = _fetch_gps_positions(session_key, driver_codes)
+                if raw_gps:
+                    # Normalize GPS coordinates to match the hand-crafted path coordinate space
+                    # OpenF1 GPS uses raw circuit meter offsets; we project into path bounding box.
+                    all_x = [v[0] for v in raw_gps.values()]
+                    all_y = [v[1] for v in raw_gps.values()]
+                    gps_x_min, gps_x_max = min(all_x), max(all_x)
+                    gps_y_min, gps_y_max = min(all_y), max(all_y)
+                    path_x_min, path_x_max = min(x_s), max(x_s)
+                    path_y_min, path_y_max = min(y_s), max(y_s)
+                    gps_x_range = (gps_x_max - gps_x_min) or 1.0
+                    gps_y_range = (gps_y_max - gps_y_min) or 1.0
+                    for drv, (gx, gy) in raw_gps.items():
+                        nx = path_x_min + (gx - gps_x_min) / gps_x_range * (path_x_max - path_x_min)
+                        ny = path_y_min + (gy - gps_y_min) / gps_y_range * (path_y_max - path_y_min)
+                        gps_positions[drv] = (nx, ny)
+        except Exception:
+            gps_positions = {}
+
+        using_gps = len(gps_positions) > 0
+
+        # --- Fall back to gap/lap-time estimated positions ---
         lap_time_est = float(lap_df["lap_time"].median()) if "lap_time" in lap_df.columns else 90.0
         if pd.isna(lap_time_est) or lap_time_est <= 0:
             lap_time_est = 90.0
         LEADER_FRACTION = 0.92
         cumulative_gap = 0.0
+
         for _, row in lap_sorted.iterrows():
-            gap = float(row["gap_ahead"]) if "gap_ahead" in row and pd.notna(row["gap_ahead"]) else 0.0
-            cumulative_gap += gap
-            fraction = (LEADER_FRACTION - cumulative_gap / lap_time_est) % 1.0
-            x_d, y_d = _position_on_path(x_s, y_s, fraction)
             drv = str(row["driver"])
             color = DRIVER_COLORS.get(drv, "#AAAAAA")
             pos = int(row["position"])
+
+            if using_gps and drv in gps_positions:
+                x_d, y_d = gps_positions[drv]
+            else:
+                gap = float(row["gap_ahead"]) if "gap_ahead" in row and pd.notna(row["gap_ahead"]) else 0.0
+                cumulative_gap += gap
+                fraction = (LEADER_FRACTION - cumulative_gap / lap_time_est) % 1.0
+                x_d, y_d = _position_on_path(x_s, y_s, fraction)
+
             fig.add_trace(go.Scatter(
                 x=[x_d], y=[y_d],
                 mode="markers+text",
                 marker=dict(size=13, color=color, symbol="circle",
                             line=dict(color="white", width=1.5)),
-                text=[drv],
+                text=[f"P{pos}"],
                 textposition="top center",
-                textfont=dict(color="white", size=9),
+                textfont=dict(color="white", size=9, family="monospace"),
                 name=f"P{pos} {drv}",
                 showlegend=True,
-                hovertext=f"P{pos} — {drv}",
+                hovertext=f"P{pos} — {drv}" + (" (GPS)" if using_gps and drv in gps_positions else " (est.)"),
                 hoverinfo="text",
             ))
 
@@ -380,6 +495,57 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
             st.plotly_chart(fig_heat, use_container_width=True)
         else:
             st.info("Sector time data not available for this race.")
+
+        # Sector time trace — two-driver comparison
+        st.markdown("#### Sector Time Comparison")
+        st.caption("Median sector time per lap for two drivers — lower is faster")
+
+        avail_drivers = sorted(df["driver"].dropna().unique().tolist())
+        sc_col1, sc_col2 = st.columns(2)
+        drv_a = sc_col1.selectbox("Driver A", avail_drivers,
+                                   index=avail_drivers.index(driver) if driver in avail_drivers else 0,
+                                   key="sector_drv_a")
+        drv_b = sc_col2.selectbox("Driver B", avail_drivers,
+                                   index=min(1, len(avail_drivers) - 1),
+                                   key="sector_drv_b")
+
+        sector_cols = [c for c in ["sector1_time", "sector2_time", "sector3_time"] if c in df.columns]
+        sector_labels = {"sector1_time": "S1", "sector2_time": "S2", "sector3_time": "S3"}
+
+        if sector_cols and drv_a != drv_b:
+            fig_sec = go.Figure()
+            for drv, color in [(drv_a, DRIVER_COLORS.get(drv_a, "#AAAAAA")),
+                               (drv_b, DRIVER_COLORS.get(drv_b, "#FFFFFF"))]:
+                drv_data = df[df["driver"] == drv].sort_values("lap")
+                for col in sector_cols:
+                    vals = pd.to_numeric(drv_data[col], errors="coerce")
+                    if vals.isna().all():
+                        continue
+                    fig_sec.add_trace(go.Scatter(
+                        x=drv_data["lap"],
+                        y=vals,
+                        name=f"{drv} {sector_labels.get(col, col)}",
+                        mode="lines",
+                        line=dict(
+                            color=color,
+                            width=2,
+                            dash="solid" if col == "sector1_time" else ("dash" if col == "sector2_time" else "dot"),
+                        ),
+                        hovertemplate=f"{drv} {sector_labels.get(col, col)}: %{{y:.3f}}s · Lap %{{x}}<extra></extra>",
+                    ))
+            fig_sec.update_layout(
+                paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                font=dict(color="white"),
+                xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                yaxis=dict(title="Sector Time (s)", gridcolor="#2A2A2A"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, font=dict(size=10)),
+                height=300,
+                margin=dict(l=50, r=20, t=20, b=40),
+            )
+            st.plotly_chart(fig_sec, use_container_width=True)
+            st.caption("Solid = S1 · Dashed = S2 · Dotted = S3")
+        elif drv_a == drv_b:
+            st.info("Select two different drivers to compare sector times.")
 
         st.divider()
 

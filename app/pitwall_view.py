@@ -176,6 +176,37 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
             else:
                 st.info(f"**Pit Strategy Model:** Optimal pit in **{laps_to_optimal} lap(s)** (lap {optimal_lap}) · pressure peaks at {peak_pressure}/100")
 
+        # Compound What-If
+        st.markdown("**Strategy Scenarios — If You Pit Now**")
+        COMPOUND_PARAMS = {
+            "SOFT":   {"color": "🔴", "stint_laps": 18, "pace_boost": -0.35, "label": "Soft"},
+            "MEDIUM": {"color": "🟡", "stint_laps": 28, "pace_boost": -0.15, "label": "Medium"},
+            "HARD":   {"color": "⚪", "stint_laps": 40, "pace_boost":  0.05, "label": "Hard"},
+        }
+        wf_cols = st.columns(3)
+        for i, (cmp, params) in enumerate(COMPOUND_PARAMS.items()):
+            with wf_cols[i]:
+                # Estimate re-entry pace delta: fresh tyres = boost vs current degraded pace
+                fresh_delta = pace_delta + params["pace_boost"]  # negative = faster than field
+                # Estimate if we undercut the car ahead
+                if pd.notna(gap_ahead) and pd.notna(pace_delta) and pace_delta > 0:
+                    laps_to_close = gap_ahead / max(pace_delta - fresh_delta, 0.01)
+                    can_undercut = laps_to_close < 8
+                else:
+                    can_undercut = False
+                # Estimate if car behind will undercut us
+                if pd.notna(gap_behind):
+                    at_risk = gap_behind < 3.0
+                else:
+                    at_risk = False
+
+                verdict = "✅ Undercut" if can_undercut else ("⚠️ Risky" if at_risk else "↔ Neutral")
+                st.metric(
+                    f"{params['color']} {params['label']}",
+                    verdict,
+                    f"~{params['stint_laps']} lap stint · {fresh_delta:+.2f}s/lap",
+                )
+
     # Granite brief
     lap_data = row.to_dict()
     lap_data["driver"] = driver
@@ -289,3 +320,47 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
         if st.button("🔄 Reset decision"):
             st.session_state.pit_decision = None
             st.rerun()
+
+    # Engineer chat interface
+    if mode == "engineer":
+        st.divider()
+        st.markdown("### Ask the Pit Wall")
+        st.caption("Ask anything about this lap's telemetry, strategy, or driver state.")
+
+        if "pitwall_chat_history" not in st.session_state:
+            st.session_state.pitwall_chat_history = []
+
+        # Display existing chat history
+        for msg in st.session_state.pitwall_chat_history:
+            with st.chat_message(msg["role"]):
+                st.write(msg["content"])
+
+        # Build lap context dict for Granite
+        lap_ctx = {
+            "compound": row.get("tyre_compound", "?"),
+            "tyre_age_laps": int(row.get("tyre_age", 0)),
+            "gap_ahead_s": f"{gap_ahead:.2f}" if pd.notna(gap_ahead) else "leading",
+            "gap_behind_s": f"{gap_behind:.2f}" if pd.notna(gap_behind) else "N/A",
+            "pace_delta_s_per_lap": f"{pace_delta:+.2f}" if pd.notna(pace_delta) else "N/A",
+            "pit_window_pressure": int(pressure),
+            "position": pos,
+            "safety_car": sc_active,
+            "track_temp_c": f"{weather:.0f}" if pd.notna(weather) else "N/A",
+        }
+
+        question = st.chat_input("e.g. Should I pit now? How are the tyres holding up?")
+        if question:
+            st.session_state.pitwall_chat_history.append({"role": "user", "content": question})
+            with st.chat_message("user"):
+                st.write(question)
+            with st.chat_message("assistant"):
+                with st.spinner("Granite thinking..."):
+                    from agent.granite import pitwall_chat
+                    answer = pitwall_chat(question, lap_ctx, driver, mode)
+                st.write(answer)
+            st.session_state.pitwall_chat_history.append({"role": "assistant", "content": answer})
+
+        if st.session_state.pitwall_chat_history:
+            if st.button("Clear chat", key="clear_pitwall_chat"):
+                st.session_state.pitwall_chat_history = []
+                st.rerun()

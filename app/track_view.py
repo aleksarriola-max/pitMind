@@ -1,4 +1,4 @@
-"""Track Intel — circuit profile, sector dominance, grid analysis, battle prediction."""
+"""Track Intel — circuit profile, sector dominance, grid analysis, battle prediction. v2."""
 
 import numpy as np
 import pandas as pd

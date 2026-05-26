@@ -73,37 +73,21 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
 
     if display_cols:
         leaderboard = stats_df[list(display_cols.keys())].copy()
+        # Convert all metric columns to float, replacing None/NaN with empty string for display
+        for col in leaderboard.columns:
+            leaderboard[col] = pd.to_numeric(leaderboard[col], errors="coerce")
         leaderboard.columns = list(display_cols.values())
         leaderboard = leaderboard.reset_index()
         leaderboard.insert(0, "#", range(1, len(leaderboard) + 1))
 
-        # Color rows: format numeric to 1 decimal
-        def style_leaderboard(df):
-            styles = pd.DataFrame("", index=df.index, columns=df.columns)
-            for col_name in df.columns:
-                if col_name in ("#", "driver"):
-                    continue
-                vals = pd.to_numeric(df[col_name], errors="coerce")
-                lower_better_flag = LEADERBOARD_METRICS.get(
-                    [k for k, v in display_cols.items() if v == col_name] [0]
-                    if [k for k, v in display_cols.items() if v == col_name] else "", (col_name, False)
-                )[1]
-                ranked = vals.rank(ascending=lower_better_flag, na_option="bottom")
-                for i in ranked.index:
-                    r = ranked[i]
-                    if r <= 3:
-                        styles.at[i, col_name] = "color: #27F4D2; font-weight: bold"
-                    elif r >= len(vals) - 1:
-                        styles.at[i, col_name] = "color: #EF4444"
-            return styles
+        # Format numerics to 1 decimal; leave NaN as "—"
+        numeric_cols = [c for c in leaderboard.columns if c not in ("#", "driver")]
+        for col in numeric_cols:
+            leaderboard[col] = leaderboard[col].apply(
+                lambda x: f"{x:.1f}" if pd.notna(x) else "—"
+            )
 
-        st.dataframe(
-            leaderboard.style.apply(style_leaderboard, axis=None).format(
-                {col: "{:.1f}" for col in leaderboard.columns if col not in ("#", "driver")}
-            ),
-            use_container_width=True,
-            height=320,
-        )
+        st.dataframe(leaderboard, use_container_width=True, height=320, hide_index=True)
 
     st.divider()
 

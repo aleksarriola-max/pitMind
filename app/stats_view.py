@@ -66,8 +66,12 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
     st.markdown("### Driver Leaderboard")
     st.caption("Click any column header to sort · Green = top 3 · Red = bottom 3")
 
+    FAN_LEADERBOARD_COLS = ["avg_finish", "avg_positions_gained", "aggression_level", "tyre_preservation"]
+    metrics_to_show = LEADERBOARD_METRICS if mode == "engineer" else {
+        k: v for k, v in LEADERBOARD_METRICS.items() if k in FAN_LEADERBOARD_COLS
+    }
     display_cols = {}
-    for col, (label, lower_better) in LEADERBOARD_METRICS.items():
+    for col, (label, lower_better) in metrics_to_show.items():
         if col in stats_df.columns:
             display_cols[col] = label
 
@@ -150,23 +154,24 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                                   mode)
         st.info(f"**{mode_label} H2H:** {narrative}")
 
-        # Win/loss table per metric
-        st.markdown("**Metric-by-metric breakdown:**")
-        rows = []
-        for col, (label, lower_better) in LEADERBOARD_METRICS.items():
-            if col not in stats_df.columns:
-                continue
-            va = stats_df.loc[driver_a, col] if driver_a in stats_df.index else None
-            vb = stats_df.loc[driver_b, col] if driver_b in stats_df.index else None
-            if pd.isna(va) or pd.isna(vb):
-                continue
-            if lower_better:
-                winner = driver_a if va < vb else driver_b
-            else:
-                winner = driver_a if va > vb else driver_b
-            rows.append({"Metric": label, driver_a: f"{float(va):.1f}", driver_b: f"{float(vb):.1f}", "Edge": winner})
-        if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        # Win/loss table per metric (engineer only)
+        if mode == "engineer":
+            st.markdown("**Metric-by-metric breakdown:**")
+            rows = []
+            for col, (label, lower_better) in LEADERBOARD_METRICS.items():
+                if col not in stats_df.columns:
+                    continue
+                va = stats_df.loc[driver_a, col] if driver_a in stats_df.index else None
+                vb = stats_df.loc[driver_b, col] if driver_b in stats_df.index else None
+                if pd.isna(va) or pd.isna(vb):
+                    continue
+                if lower_better:
+                    winner = driver_a if va < vb else driver_b
+                else:
+                    winner = driver_a if va > vb else driver_b
+                rows.append({"Metric": label, driver_a: f"{float(va):.1f}", driver_b: f"{float(vb):.1f}", "Edge": winner})
+            if rows:
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -179,8 +184,12 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
         st.info(f"No season arc data for {selected_driver}.")
         return
 
-    arc_metrics = [m for m in ["finish_position", "avg_pace_delta", "tyre_preservation",
-                                "aggression_level", "pressure_consistency"] if m in arc_df.columns]
+    arc_metrics = (
+        [m for m in ["finish_position", "avg_pace_delta", "tyre_preservation",
+                     "aggression_level", "pressure_consistency"] if m in arc_df.columns]
+        if mode == "engineer"
+        else [m for m in ["finish_position"] if m in arc_df.columns]
+    )
     metric_labels = {
         "finish_position": "Finish Position",
         "avg_pace_delta": "Avg Pace Delta (s)",

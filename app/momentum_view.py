@@ -213,27 +213,28 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
 
     st.divider()
 
-    # ── Shift detail panel ──────────────────────────────────────────────────────
-    st.subheader("Momentum Shifts")
-    if top_shifts:
-        cols = st.columns([1, 1, 3])
-        cols[0].markdown("**Lap / Driver**")
-        cols[1].markdown("**Shift**")
-        cols[2].markdown("**Granite annotation**")
-        for shift in top_shifts[:8]:
+    # ── Shift detail panel (engineer only) ─────────────────────────────────────
+    if mode == "engineer":
+        st.subheader("Momentum Shifts")
+        if top_shifts:
             cols = st.columns([1, 1, 3])
-            icon = "🟢" if shift["direction"] == "up" else "🔴"
-            cols[0].write(f"Lap {shift['lap']} · {shift['driver']}")
-            cols[1].write(f"{icon} {shift['magnitude']:.0f} pts")
-            cols[2].write(_get_shift_annotation(json.dumps(shift), mode))
-            if cols[0].button("Replay", key=f"replay_{shift['lap']}_{shift['driver']}"):
-                st.session_state.selected_lap = shift["lap"]
-                st.session_state.replay_lap = shift["lap"]
-                st.session_state.selected_driver = shift["driver"]
-                st.session_state.pit_decision = None
-                st.rerun()
-    else:
-        st.info("No significant momentum shifts detected for the selected drivers.")
+            cols[0].markdown("**Lap / Driver**")
+            cols[1].markdown("**Shift**")
+            cols[2].markdown("**Granite annotation**")
+            for shift in top_shifts[:8]:
+                cols = st.columns([1, 1, 3])
+                icon = "🟢" if shift["direction"] == "up" else "🔴"
+                cols[0].write(f"Lap {shift['lap']} · {shift['driver']}")
+                cols[1].write(f"{icon} {shift['magnitude']:.0f} pts")
+                cols[2].write(_get_shift_annotation(json.dumps(shift), mode))
+                if cols[0].button("Replay", key=f"replay_{shift['lap']}_{shift['driver']}"):
+                    st.session_state.selected_lap = shift["lap"]
+                    st.session_state.replay_lap = shift["lap"]
+                    st.session_state.selected_driver = shift["driver"]
+                    st.session_state.pit_decision = None
+                    st.rerun()
+        else:
+            st.info("No significant momentum shifts detected for the selected drivers.")
 
     st.divider()
 
@@ -278,10 +279,13 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
         else:
             for i, shift in enumerate(top5):
                 icon = "🟢" if shift["direction"] == "up" else "🔴"
-                delta_label = f"+{shift['magnitude']:.0f}" if shift["direction"] == "up" else f"-{shift['magnitude']:.0f}"
                 cols = st.columns([0.3, 0.15, 2])
                 cols[0].markdown(f"**#{i+1} Lap {shift['lap']} — {shift['driver']}**")
-                cols[1].markdown(f"{icon} **{delta_label} pts**")
+                if mode == "engineer":
+                    delta_label = f"+{shift['magnitude']:.0f}" if shift["direction"] == "up" else f"-{shift['magnitude']:.0f}"
+                    cols[1].markdown(f"{icon} **{delta_label} pts**")
+                else:
+                    cols[1].markdown(icon)
                 annotation = _get_shift_annotation(json.dumps(shift), mode)
                 cols[2].markdown(annotation)
                 if i < len(top5) - 1:

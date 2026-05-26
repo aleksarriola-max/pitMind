@@ -345,118 +345,109 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
         st.subheader("Circuit Layout")
         st.plotly_chart(fig_circuit, use_container_width=True)
 
-    st.divider()
+    if mode == "engineer":
+        st.divider()
 
-    # ── Sector Dominance Heatmap ───────────────────────────────────────────────
-    st.subheader("Sector Dominance")
-    st.caption("Delta vs. field median (ms) — negative = faster than average")
-
-    if len(sector_dom) > 0:
-        cols_avail = [c for c in ["sector1", "sector2", "sector3"] if c in sector_dom.columns]
-        col_labels = {"sector1": "S1", "sector2": "S2", "sector3": "S3"}
-        heat_df = sector_dom[cols_avail].rename(columns=col_labels)
-
-        drivers_ordered = heat_df.index.tolist()
-        sector_labels = heat_df.columns.tolist()
-        z_vals = heat_df.values.tolist()
-
-        fig_heat = go.Figure(go.Heatmap(
-            z=z_vals,
-            x=sector_labels,
-            y=drivers_ordered,
-            colorscale=[[0, "#E10600"], [0.5, "#1C1C1C"], [1, "#27F4D2"]],
-            zmid=0,
-            text=[[f"{v:+.0f}ms" for v in row] for row in z_vals],
-            texttemplate="%{text}",
-            showscale=True,
-            colorbar=dict(title="ms vs median"),
-        ))
-        fig_heat.update_layout(
-            paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
-            font=dict(color="white"),
-            height=260,
-            margin=dict(l=60, r=20, t=10, b=40),
-            xaxis=dict(title="Sector", side="bottom"),
-            yaxis=dict(title="Driver", autorange="reversed"),
-        )
-        st.plotly_chart(fig_heat, use_container_width=True)
-    else:
-        st.info("Sector time data not available for this race.")
-
-    st.divider()
-
-    # ── Grid → Finish Position Analysis ───────────────────────────────────────
-    st.subheader("Starting Grid vs. Race Finish")
-
-    gf_df = _grid_finish_df(all_race_dfs)
-
-    if len(gf_df) > 0:
-        col_left, col_right = st.columns(2)
-
-        # Selected race scatter
-        with col_left:
-            race_gf = gf_df[gf_df["race"] == race_slug]
-            if len(race_gf) > 0:
-                st.caption("This race — grid vs finish position")
-                fig_scatter = go.Figure()
-                for _, row in race_gf.iterrows():
-                    drv = row["driver"]
-                    color = DRIVER_COLORS.get(drv, "#888888")
-                    fig_scatter.add_trace(go.Scatter(
-                        x=[row["grid"]], y=[row["finish"]],
-                        mode="markers+text",
-                        name=drv,
-                        marker=dict(size=14, color=color),
-                        text=[drv], textposition="top center",
-                        showlegend=False,
-                    ))
-                # Diagonal line (grid == finish)
-                max_pos = max(race_gf["grid"].max(), race_gf["finish"].max()) + 1
-                fig_scatter.add_trace(go.Scatter(
-                    x=list(range(1, max_pos)), y=list(range(1, max_pos)),
-                    mode="lines", line=dict(color="#555555", dash="dot"),
-                    name="No change", showlegend=False,
-                ))
-                fig_scatter.update_layout(
-                    paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
-                    font=dict(color="white"),
-                    xaxis=dict(title="Grid Position", gridcolor="#2A2A2A", autorange="reversed"),
-                    yaxis=dict(title="Finish Position", gridcolor="#2A2A2A", autorange="reversed"),
-                    height=280,
-                    margin=dict(l=50, r=20, t=10, b=50),
-                )
-                st.plotly_chart(fig_scatter, use_container_width=True)
-
-        # Season average bar
-        with col_right:
-            st.caption("Season average — positions gained from grid")
-            avg_gained = gf_df.groupby("driver")["gained"].mean().reset_index()
-            avg_gained = avg_gained.sort_values("gained", ascending=True)
-            colors = ["#E10600" if g < 0 else "#27F4D2" for g in avg_gained["gained"]]
-            fig_bar = go.Figure(go.Bar(
-                x=avg_gained["gained"],
-                y=avg_gained["driver"],
-                orientation="h",
-                marker_color=colors,
-                text=[f"{g:+.1f}" for g in avg_gained["gained"]],
-                textposition="outside",
+        # ── Sector Dominance Heatmap ───────────────────────────────────────────
+        st.subheader("Sector Dominance")
+        st.caption("Delta vs. field median (ms) — negative = faster than average")
+        if len(sector_dom) > 0:
+            cols_avail = [c for c in ["sector1", "sector2", "sector3"] if c in sector_dom.columns]
+            col_labels = {"sector1": "S1", "sector2": "S2", "sector3": "S3"}
+            heat_df = sector_dom[cols_avail].rename(columns=col_labels)
+            drivers_ordered = heat_df.index.tolist()
+            sector_labels = heat_df.columns.tolist()
+            z_vals = heat_df.values.tolist()
+            fig_heat = go.Figure(go.Heatmap(
+                z=z_vals,
+                x=sector_labels,
+                y=drivers_ordered,
+                colorscale=[[0, "#E10600"], [0.5, "#1C1C1C"], [1, "#27F4D2"]],
+                zmid=0,
+                text=[[f"{v:+.0f}ms" for v in row] for row in z_vals],
+                texttemplate="%{text}",
+                showscale=True,
+                colorbar=dict(title="ms vs median"),
             ))
-            fig_bar.update_layout(
+            fig_heat.update_layout(
                 paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
                 font=dict(color="white"),
-                xaxis=dict(title="Avg positions gained", gridcolor="#2A2A2A", zeroline=True,
-                           zerolinecolor="#888888"),
-                yaxis=dict(gridcolor="#2A2A2A"),
-                height=280,
-                margin=dict(l=60, r=60, t=10, b=50),
+                height=260,
+                margin=dict(l=60, r=20, t=10, b=40),
+                xaxis=dict(title="Sector", side="bottom"),
+                yaxis=dict(title="Driver", autorange="reversed"),
             )
-            st.plotly_chart(fig_bar, use_container_width=True)
-    else:
-        st.info("Grid position data not available.")
+            st.plotly_chart(fig_heat, use_container_width=True)
+        else:
+            st.info("Sector time data not available for this race.")
 
+        st.divider()
+
+        # ── Grid → Finish Position Analysis ───────────────────────────────────
+        st.subheader("Starting Grid vs. Race Finish")
+
+        gf_df = _grid_finish_df(all_race_dfs)
+        if len(gf_df) > 0:
+            col_left, col_right = st.columns(2)
+            with col_left:
+                race_gf = gf_df[gf_df["race"] == race_slug]
+                if len(race_gf) > 0:
+                    st.caption("This race — grid vs finish position")
+                    fig_scatter = go.Figure()
+                    for _, row in race_gf.iterrows():
+                        drv = row["driver"]
+                        color = DRIVER_COLORS.get(drv, "#888888")
+                        fig_scatter.add_trace(go.Scatter(
+                            x=[row["grid"]], y=[row["finish"]],
+                            mode="markers+text",
+                            name=drv,
+                            marker=dict(size=14, color=color),
+                            text=[drv], textposition="top center",
+                            showlegend=False,
+                        ))
+                    max_pos = max(race_gf["grid"].max(), race_gf["finish"].max()) + 1
+                    fig_scatter.add_trace(go.Scatter(
+                        x=list(range(1, max_pos)), y=list(range(1, max_pos)),
+                        mode="lines", line=dict(color="#555555", dash="dot"),
+                        name="No change", showlegend=False,
+                    ))
+                    fig_scatter.update_layout(
+                        paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                        font=dict(color="white"),
+                        xaxis=dict(title="Grid Position", gridcolor="#2A2A2A", autorange="reversed"),
+                        yaxis=dict(title="Finish Position", gridcolor="#2A2A2A", autorange="reversed"),
+                        height=280,
+                        margin=dict(l=50, r=20, t=10, b=50),
+                    )
+                    st.plotly_chart(fig_scatter, use_container_width=True)
+            with col_right:
+                st.caption("Season average — positions gained from grid")
+                avg_gained = gf_df.groupby("driver")["gained"].mean().reset_index()
+                avg_gained = avg_gained.sort_values("gained", ascending=True)
+                colors = ["#E10600" if g < 0 else "#27F4D2" for g in avg_gained["gained"]]
+                fig_bar = go.Figure(go.Bar(
+                    x=avg_gained["gained"],
+                    y=avg_gained["driver"],
+                    orientation="h",
+                    marker_color=colors,
+                    text=[f"{g:+.1f}" for g in avg_gained["gained"]],
+                    textposition="outside",
+                ))
+                fig_bar.update_layout(
+                    paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                    font=dict(color="white"),
+                    xaxis=dict(title="Avg positions gained", gridcolor="#2A2A2A", zeroline=True,
+                               zerolinecolor="#888888"),
+                    yaxis=dict(gridcolor="#2A2A2A"),
+                    height=280,
+                    margin=dict(l=60, r=60, t=10, b=50),
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.info("Grid position data not available.")
+
+    # ── Aggression Zones (both modes) ─────────────────────────────────────────
     st.divider()
-
-    # ── Aggression Zones ───────────────────────────────────────────────────────
     st.subheader("Where in the Race Do Position Battles Happen?")
 
     agg_stats = get_aggression_zone_stats(df)
@@ -483,87 +474,82 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
         )
         st.plotly_chart(fig_agg, use_container_width=True)
 
+    if mode == "engineer":
+        st.divider()
+
+        # ── Battle Prediction ──────────────────────────────────────────────────
+        st.subheader(f"Battle Forecast — Next 15 Laps from Lap {lap}")
+
+        if len(df) == 0:
+            st.info("No race data for battle forecast.")
+            return
+
+        n_laps = 15
+        proj_df, aggression_windows = forecast_positions(df, lap, n_laps)
+
+        if len(proj_df) == 0:
+            st.info("Not enough data for battle forecast at this lap.")
+            return
+
+        # Position trajectory chart
+        fig_traj = go.Figure()
+        drivers_in_proj = proj_df["driver"].unique()
+        for drv in drivers_in_proj:
+            drv_proj = proj_df[proj_df["driver"] == drv]
+            color = DRIVER_COLORS.get(drv, "#888888")
+            is_selected = drv == driver
+            fig_traj.add_trace(go.Scatter(
+                x=drv_proj["lap"],
+                y=drv_proj["projected_position"],
+                name=drv,
+                line=dict(
+                    color=color,
+                    width=3 if is_selected else 1.5,
+                    dash="solid" if is_selected else "dot",
+                ),
+                mode="lines",
+            ))
+
+        fig_traj.add_vline(x=lap, line=dict(color="white", dash="dot", width=1),
+                           annotation_text="Now", annotation_position="top left",
+                           annotation_font=dict(color="white", size=10))
+
+        fig_traj.update_layout(
+            paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+            font=dict(color="white"),
+            xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+            yaxis=dict(title="Projected Position", autorange="reversed",
+                       tickvals=list(range(1, len(drivers_in_proj) + 1)),
+                       gridcolor="#2A2A2A"),
+            height=280,
+            margin=dict(l=50, r=20, t=20, b=40),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01),
+        )
+        st.plotly_chart(fig_traj, use_container_width=True)
+
+        # Aggression windows table
+        if aggression_windows:
+            drs_windows = [w for w in aggression_windows if w["is_drs_range"]]
+            close_windows = [w for w in aggression_windows if not w["is_drs_range"]]
+            if drs_windows:
+                st.markdown("**DRS range battles (gap < 1.0s):**")
+                for w in drs_windows[:5]:
+                    st.markdown(
+                        f"- Lap {w['lap']}: **{w['driver_behind']}** vs {w['driver_ahead']} "
+                        f"— projected gap {w['projected_gap']:.2f}s"
+                    )
+            if close_windows:
+                st.markdown("**Close battles (gap 1-2s):**")
+                for w in close_windows[:5]:
+                    st.markdown(
+                        f"- Lap {w['lap']}: {w['driver_behind']} approaching {w['driver_ahead']} "
+                        f"({w['projected_gap']:.2f}s)"
+                    )
+        else:
+            st.write("No close battles forecast in the next 15 laps.")
+
+    # ── Pilot Error Detection (compute for both modes — Granite uses in both) ───
     st.divider()
-
-    # ── Battle Prediction ──────────────────────────────────────────────────────
-    st.subheader(f"Battle Forecast — Next 15 Laps from Lap {lap}")
-
-    if len(df) == 0:
-        st.info("No race data for battle forecast.")
-        return
-
-    n_laps = 15
-    proj_df, aggression_windows = forecast_positions(df, lap, n_laps)
-
-    if len(proj_df) == 0:
-        st.info("Not enough data for battle forecast at this lap.")
-        return
-
-    # Position trajectory chart
-    fig_traj = go.Figure()
-    drivers_in_proj = proj_df["driver"].unique()
-    for drv in drivers_in_proj:
-        drv_proj = proj_df[proj_df["driver"] == drv]
-        color = DRIVER_COLORS.get(drv, "#888888")
-        is_selected = drv == driver
-        fig_traj.add_trace(go.Scatter(
-            x=drv_proj["lap"],
-            y=drv_proj["projected_position"],
-            name=drv,
-            line=dict(
-                color=color,
-                width=3 if is_selected else 1.5,
-                dash="solid" if is_selected else "dot",
-            ),
-            mode="lines",
-        ))
-
-    fig_traj.add_vline(x=lap, line=dict(color="white", dash="dot", width=1),
-                       annotation_text="Now", annotation_position="top left",
-                       annotation_font=dict(color="white", size=10))
-
-    fig_traj.update_layout(
-        paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
-        font=dict(color="white"),
-        xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
-        yaxis=dict(title="Projected Position", autorange="reversed",
-                   tickvals=list(range(1, len(drivers_in_proj) + 1)),
-                   gridcolor="#2A2A2A"),
-        height=280,
-        margin=dict(l=50, r=20, t=20, b=40),
-        legend=dict(orientation="h", yanchor="bottom", y=1.01),
-    )
-    st.plotly_chart(fig_traj, use_container_width=True)
-
-    # Aggression windows table
-    if aggression_windows:
-        drs_windows = [w for w in aggression_windows if w["is_drs_range"]]
-        close_windows = [w for w in aggression_windows if not w["is_drs_range"]]
-
-        if drs_windows:
-            st.markdown("**DRS range battles (gap < 1.0s):**")
-            for w in drs_windows[:5]:
-                st.markdown(
-                    f"- Lap {w['lap']}: **{w['driver_behind']}** vs {w['driver_ahead']} "
-                    f"— projected gap {w['projected_gap']:.2f}s"
-                )
-        if close_windows:
-            st.markdown("**Close battles (gap 1-2s):**")
-            for w in close_windows[:5]:
-                st.markdown(
-                    f"- Lap {w['lap']}: {w['driver_behind']} approaching {w['driver_ahead']} "
-                    f"({w['projected_gap']:.2f}s)"
-                )
-    else:
-        st.write("No close battles forecast in the next 15 laps.")
-
-    st.divider()
-
-    # ── Pilot Error & Strategy Oversight ──────────────────────────────────────
-    st.subheader("Pilot Error & Strategy Oversight")
-    st.caption("Detected from telemetry: lock-ups, pace collapses, late pits, SC restart losses, radio stress")
-
-    # Derive flag periods without importing load_flags (avoids sys.modules cache issues)
     try:
         import os as _os, json as _json
         _cache = _os.path.join(_os.path.dirname(__file__), "..", "data", "cache", f"{race_slug}_flags.json")
@@ -573,51 +559,55 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     if not flag_periods and "safety_car_active" in df.columns:
         sc_laps = sorted(df[df["safety_car_active"]]["lap"].unique())
         flag_periods, start, prev = [], sc_laps[0] if sc_laps else None, sc_laps[0] if sc_laps else None
-        for lap in (sc_laps[1:] if sc_laps else []):
-            if lap > prev + 1:
+        for _fl in (sc_laps[1:] if sc_laps else []):
+            if _fl > prev + 1:
                 flag_periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
-                start = lap
-            prev = lap
+                start = _fl
+            prev = _fl
         if sc_laps:
             flag_periods.append({"flag": "SAFETY_CAR", "lap_start": int(start), "lap_end": int(prev)})
     error_df = detect_pilot_errors(df, flag_periods)
     counts = error_counts(error_df)
-
+    drv_errors = error_df[error_df["driver"] == driver] if len(error_df) > 0 else pd.DataFrame()
+    drv_error_list = drv_errors.to_dict("records") if len(drv_errors) > 0 else []
     mode_label = "Fan" if mode == "fan" else "Engineer"
 
-    if len(counts) == 0:
-        st.info("No pilot errors detected for this race (may require radio sentiment data for full coverage).")
-    else:
-        # Summary row — all drivers
-        st.markdown("**Error Summary — All Drivers**")
-        summary_cols = st.columns(min(len(counts), 4))
-        for i, (drv, type_counts) in enumerate(sorted(counts.items(), key=lambda x: sum(x[1].values()), reverse=True)):
-            total = sum(type_counts.values())
-            col = summary_cols[i % len(summary_cols)]
-            col.metric(drv, f"{total} errors", " · ".join(f"{v} {k.replace('_',' ').lower()}" for k, v in type_counts.items()))
+    if mode == "engineer":
+        # ── Full Pilot Error section ───────────────────────────────────────────
+        st.subheader("Pilot Error & Strategy Oversight")
+        st.caption("Detected from telemetry: lock-ups, pace collapses, late pits, SC restart losses, radio stress")
 
-        st.divider()
-
-        # Selected driver detail
-        st.markdown(f"**{driver} — Incident Log**")
-        drv_errors = error_df[error_df["driver"] == driver] if len(error_df) > 0 else pd.DataFrame()
-
-        # Granite summary
-        drv_error_list = drv_errors.to_dict("records") if len(drv_errors) > 0 else []
-        granite_err = error_summary(drv_error_list, driver, mode)
-        st.info(f"**{mode_label} Analysis:** {granite_err}")
-
-        if len(drv_errors) > 0:
-            ERROR_ICONS = {
-                "LOCKUP": "⚡", "PACE_COLLAPSE": "📉", "LATE_PIT": "🔧",
-                "SC_LOSS": "🚨", "RADIO_STRESS": "📻", "TRACK_LIMITS": "⚠️",
-            }
-            for _, row in drv_errors.iterrows():
-                icon = ERROR_ICONS.get(row["error_type"], "•")
-                severity_color = "🔴" if row["severity"] == "major" else "🟡"
-                st.markdown(
-                    f"{severity_color} **Lap {int(row['lap'])}** {icon} `{row['error_type']}` — "
-                    f"{row['description']} *(signal: {row['signal_value']:.2f})*"
-                )
+        if len(counts) == 0:
+            st.info("No pilot errors detected for this race (may require radio sentiment data for full coverage).")
         else:
-            st.success(f"{driver} had a clean race — no errors detected.")
+            st.markdown("**Error Summary — All Drivers**")
+            summary_cols = st.columns(min(len(counts), 4))
+            for i, (drv, type_counts) in enumerate(sorted(counts.items(), key=lambda x: sum(x[1].values()), reverse=True)):
+                total = sum(type_counts.values())
+                col = summary_cols[i % len(summary_cols)]
+                col.metric(drv, f"{total} errors", " · ".join(f"{v} {k.replace('_',' ').lower()}" for k, v in type_counts.items()))
+
+            st.divider()
+            st.markdown(f"**{driver} — Incident Log**")
+            granite_err = error_summary(drv_error_list, driver, mode)
+            st.info(f"**{mode_label} Analysis:** {granite_err}")
+
+            if len(drv_errors) > 0:
+                ERROR_ICONS = {
+                    "LOCKUP": "⚡", "PACE_COLLAPSE": "📉", "LATE_PIT": "🔧",
+                    "SC_LOSS": "🚨", "RADIO_STRESS": "📻", "TRACK_LIMITS": "⚠️",
+                }
+                for _, row in drv_errors.iterrows():
+                    icon = ERROR_ICONS.get(row["error_type"], "•")
+                    severity_color = "🔴" if row["severity"] == "major" else "🟡"
+                    st.markdown(
+                        f"{severity_color} **Lap {int(row['lap'])}** {icon} `{row['error_type']}` — "
+                        f"{row['description']} *(signal: {row['signal_value']:.2f})*"
+                    )
+            else:
+                st.success(f"{driver} had a clean race — no errors detected.")
+    else:
+        # Fan mode: Granite narrative only
+        if drv_error_list:
+            granite_err = error_summary(drv_error_list, driver, mode)
+            st.info(f"**Fan Intel:** {granite_err}")

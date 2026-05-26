@@ -196,17 +196,23 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
     if lap_state:
         fig_pred = _prediction_bars(lap_state)
         st.plotly_chart(fig_pred, use_container_width=True)
+        if mode == "engineer":
+            pred_rows = [{"Outcome": PRED_LABELS.get(c, c), "Probability": f"{lap_state.get(c, 0):.1%}"} for c in PRED_COLS]
+            st.dataframe(pd.DataFrame(pred_rows), hide_index=True, use_container_width=True)
 
-    # SHAP
+    # SHAP (engineer only)
     st.divider()
-    st.markdown("**SHAP — What's driving the position gain prediction?**")
-    shap_vals = _get_shap_for_lap(driver, lap, df["race"].iloc[0].lower().replace(" ", "_"))
-    if shap_vals:
-        fig_shap = _shap_bars(shap_vals)
-        if fig_shap:
-            st.plotly_chart(fig_shap, use_container_width=True)
+    if mode == "engineer":
+        st.markdown("**SHAP — What's driving the position gain prediction?**")
+        shap_vals = _get_shap_for_lap(driver, lap, df["race"].iloc[0].lower().replace(" ", "_"))
+        if shap_vals:
+            fig_shap = _shap_bars(shap_vals)
+            if fig_shap:
+                st.plotly_chart(fig_shap, use_container_width=True)
+        else:
+            st.caption("SHAP values unavailable for this lap.")
     else:
-        st.caption("SHAP values unavailable for this lap.")
+        shap_vals = {}
 
     # Granite narrative
     st.divider()

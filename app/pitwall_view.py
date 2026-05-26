@@ -119,9 +119,7 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
 
     row = row.iloc[0]
 
-    # --- Engineer dashboard ---
-    st.markdown("### What your engineers see right now")
-    c1, c2, c3, c4 = st.columns(4)
+    # Extract raw values (used in both modes and Granite brief)
     compound = row.get("tyre_compound", "?")
     tyre_age = int(row.get("tyre_age", 0))
     gap_ahead = row.get("gap_ahead", np.nan)
@@ -129,21 +127,41 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
     pace_delta = row.get("pace_delta", 0)
     pressure = row.get("pit_window_pressure", 50)
     weather = row.get("weather_track_temp", np.nan)
-
     compound_emoji = {"SOFT": "🔴", "MEDIUM": "🟡", "HARD": "⚪"}.get(compound, "🔵")
-    c1.metric(f"{compound_emoji} Tyre", f"{compound} · {tyre_age} laps")
-    c2.metric("Gap Ahead", f"{gap_ahead:.2f}s" if pd.notna(gap_ahead) else "—")
-    c3.metric("Gap Behind", f"{gap_behind:.2f}s" if pd.notna(gap_behind) else "—")
-    c4.metric("Pace Delta", f"+{pace_delta:.2f}s/lap" if pd.notna(pace_delta) else "—")
-
-    c5, c6, c7, c8 = st.columns(4)
-    pit_pressure_pct = int(pressure)
     sc_active = bool(row.get("safety_car_active", False))
     pos = int(row.get("position", 0)) if pd.notna(row.get("position")) else "?"
-    c5.metric("Pit Window Pressure", f"{pit_pressure_pct}/100")
-    c6.metric("Track Temp", f"{weather:.0f}°C" if pd.notna(weather) else "—")
-    c7.metric("Safety Car", "🟡 Active" if sc_active else "✅ Clear")
-    c8.metric("Position", f"P{pos}")
+    pit_pressure_pct = int(pressure)
+
+    if mode == "fan":
+        st.markdown("### What's happening right now")
+        tyre_health = ("Fresh" if tyre_age < 10 else "Good" if tyre_age < 20
+                       else "Getting worn" if tyre_age < 30 else "Very worn — watch out")
+        urgency = ("High — team wants to pit" if pressure >= 75
+                   else "Moderate — watching closely" if pressure >= 50 else "Low — tyres holding")
+        if pd.notna(gap_ahead):
+            gap_label = ("DRS range — under attack!" if gap_ahead < 1.0
+                         else "Close — pressure building" if gap_ahead < 2.5 else "Clear ahead")
+        else:
+            gap_label = "Leading the race"
+        fc1, fc2, fc3 = st.columns(3)
+        fc1.metric(f"{compound_emoji} Tyres", compound, tyre_health)
+        fc2.metric("Gap to car ahead", gap_label)
+        fc3.metric("Pit urgency", urgency)
+        fc4, fc5 = st.columns(2)
+        fc4.metric("Race position", f"P{pos}")
+        fc5.metric("Safety Car", "🟡 On track" if sc_active else "✅ Clear")
+    else:
+        st.markdown("### What your engineers see right now")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric(f"{compound_emoji} Tyre", f"{compound} · {tyre_age} laps")
+        c2.metric("Gap Ahead", f"{gap_ahead:.2f}s" if pd.notna(gap_ahead) else "—")
+        c3.metric("Gap Behind", f"{gap_behind:.2f}s" if pd.notna(gap_behind) else "—")
+        c4.metric("Pace Delta", f"+{pace_delta:.2f}s/lap" if pd.notna(pace_delta) else "—")
+        c5, c6, c7, c8 = st.columns(4)
+        c5.metric("Pit Window Pressure", f"{pit_pressure_pct}/100")
+        c6.metric("Track Temp", f"{weather:.0f}°C" if pd.notna(weather) else "—")
+        c7.metric("Safety Car", "🟡 Active" if sc_active else "✅ Clear")
+        c8.metric("Position", f"P{pos}")
 
     # Granite brief
     lap_data = row.to_dict()

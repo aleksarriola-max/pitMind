@@ -33,9 +33,9 @@ TEAM_COLORS = {
 }
 
 DRIVER_TEAMS = {
-    "VER": "Red Bull", "PER": "Red Bull",
+    "VER": "Red Bull", "OCO": "Haas",
     "HAM": "Ferrari",  "RUS": "Mercedes",
-    "LEC": "Ferrari",  "SAI": "Williams",
+    "LEC": "Ferrari",  "PIA": "McLaren",
     "NOR": "McLaren",
     "ALO": "Aston Martin",
 }

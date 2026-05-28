@@ -77,13 +77,13 @@ CIRCUIT_PROFILES = {
 
 DRIVER_COLORS = {
     "VER": "#3671C6", "HAM": "#E8002D", "LEC": "#E8002D",
-    "SAI": "#64C4FF", "ALO": "#229971", "PER": "#3671C6",
+    "PIA": "#FF8000", "ALO": "#229971", "OCO": "#B6BABD",
     "NOR": "#FF8000", "RUS": "#27F4D2",
 }
 
 DRIVER_NUMBERS = {
-    "VER": 1, "HAM": 44, "LEC": 16, "SAI": 55,
-    "NOR": 4, "ALO": 14, "RUS": 63, "PER": 11,
+    "VER": 1, "HAM": 44, "LEC": 16, "PIA": 81,
+    "NOR": 4, "ALO": 14, "RUS": 63, "OCO": 31,
 }
 
 # Module-level cache for OpenF1 session keys (slug → int)

@@ -22,7 +22,7 @@ except ImportError:
 
 DRIVER_COLORS = {
     "VER": "#3671C6", "HAM": "#E8002D", "LEC": "#E8002D",
-    "SAI": "#64C4FF", "ALO": "#229971", "PER": "#3671C6",
+    "PIA": "#FF8000", "ALO": "#229971", "OCO": "#B6BABD",
     "NOR": "#FF8000", "RUS": "#27F4D2",
 }
 
@@ -238,9 +238,9 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
 
         # Build team → [drivers in stats_df] mapping
         DRIVER_TO_TEAM = {
-            "VER": "Red Bull",    "PER": "Red Bull",
+            "VER": "Red Bull",    "OCO": "Haas",
             "HAM": "Ferrari",     "LEC": "Ferrari",
-            "SAI": "Williams",    "RUS": "Mercedes",
+            "PIA": "McLaren",     "RUS": "Mercedes",
             "NOR": "McLaren",     "ALO": "Aston Martin",
         }
         from collections import defaultdict

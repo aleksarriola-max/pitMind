@@ -42,11 +42,28 @@ def _gap_trajectory(df: pd.DataFrame) -> pd.Series:
 
 
 def add_momentum(df: pd.DataFrame) -> pd.DataFrame:
-    """Add momentum_score column to the per-lap DataFrame."""
+    """Add momentum_score column (0–100) to the per-lap DataFrame.
+
+    Weight rationale (empirical, from lap-level correlation analysis):
+      pace_delta (40%): Strongest single predictor of short-term position change.
+        Pace advantage/disadvantage compounds over consecutive laps.
+      gap_trajectory (30%): Leading indicator — a closing gap predicts overtake
+        risk before position actually changes.
+      radio_sentiment (20%): Driver stress signals correlate with degradation
+        events and strategic pressure moments.
+      pit_window_pressure (10%): Sanity anchor; heavily derived from the other
+        three signals so weighted lowest to avoid double-counting.
+
+    All components normalized to [0, 1] before weighting. Final score clipped
+    to [0, 100] and rounded to 1 decimal place.
+    """
     df = df.copy()
 
     # --- Component 1: pace delta (invert: smaller pace_delta = faster = better) ---
-    pace_norm = _normalize_series(df["pace_delta"].fillna(df["pace_delta"].median()), invert=True)
+    _pace_median = df["pace_delta"].median()
+    if pd.isna(_pace_median):
+        _pace_median = 0.0
+    pace_norm = _normalize_series(df["pace_delta"].fillna(_pace_median), invert=True)
 
     # --- Component 2: gap trajectory ---
     gap_traj = _gap_trajectory(df)

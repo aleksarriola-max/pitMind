@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 
 from agent.granite import pitwall_brief, reveal_outcome
 from models.driver_soul import get_lap_state, TRAIT_COLS
+from models.race_forecast import compare_pit_scenarios
+from agent.granite import strategy_recommendation
 
 
 @st.cache_data(show_spinner=False)
@@ -163,18 +165,47 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
         c7.metric("Safety Car", "🟡 Active" if sc_active else "✅ Clear")
         c8.metric("Position", f"P{pos}")
 
-        # Pit Strategy Optimizer
-        drv_full = df[df["driver"] == driver].sort_values("lap")
-        ahead_window = drv_full[(drv_full["lap"] >= lap) & (drv_full["lap"] <= lap + 15)]
-        if len(ahead_window) > 0 and "pit_window_pressure" in ahead_window.columns:
-            peak_idx = ahead_window["pit_window_pressure"].idxmax()
-            optimal_lap = int(ahead_window.loc[peak_idx, "lap"])
-            peak_pressure = int(ahead_window.loc[peak_idx, "pit_window_pressure"])
-            laps_to_optimal = optimal_lap - lap
-            if laps_to_optimal == 0:
-                st.warning(f"**Pit Strategy Model:** Pit **now** — window pressure peaks this lap ({peak_pressure}/100)")
-            else:
-                st.info(f"**Pit Strategy Model:** Optimal pit in **{laps_to_optimal} lap(s)** (lap {optimal_lap}) · pressure peaks at {peak_pressure}/100")
+        # Pit Strategy Optimizer — Scenario Comparison Engine
+        st.markdown("**Pit Strategy Optimizer — Scenario Analysis**")
+        try:
+            _race_slug = st.session_state.get("selected_race", "bahrain_2025")
+            _scenarios = compare_pit_scenarios(df, _race_slug, lap, driver, n_laps=15)
+        except Exception:
+            _scenarios = []
+
+        if _scenarios:
+            _sc_cols = st.columns(4)
+            for _i, _sc in enumerate(_scenarios):
+                with _sc_cols[_i]:
+                    _delta = _sc["position_delta"]
+                    _delta_str = f"+{_delta}" if _delta > 0 else str(_delta)
+                    _delta_color = "normal" if _delta == 0 else ("inverse" if _delta > 0 else "off")
+                    if _sc["recommendation"]:
+                        st.markdown(
+                            '<div style="border:2px solid #22C55E;border-radius:6px;padding:4px;margin-bottom:4px;">'
+                            f'<b style="color:#22C55E">★ {_sc["label"]}</b></div>',
+                            unsafe_allow_html=True,
+                        )
+                    st.metric(
+                        label=_sc["label"],
+                        value=f"P{_sc['projected_position']}",
+                        delta=f"{_delta_str} pos",
+                        delta_color=_delta_color,
+                    )
+            st.info(strategy_recommendation(_scenarios, driver, lap, mode))
+        else:
+            # Fallback: original argmax display
+            _drv_full = df[df["driver"] == driver].sort_values("lap")
+            _ahead_window = _drv_full[(_drv_full["lap"] >= lap) & (_drv_full["lap"] <= lap + 15)]
+            if len(_ahead_window) > 0 and "pit_window_pressure" in _ahead_window.columns:
+                _peak_idx = _ahead_window["pit_window_pressure"].idxmax()
+                _optimal_lap = int(_ahead_window.loc[_peak_idx, "lap"])
+                _peak_pressure = int(_ahead_window.loc[_peak_idx, "pit_window_pressure"])
+                _laps_to_optimal = _optimal_lap - lap
+                if _laps_to_optimal == 0:
+                    st.warning(f"**Pit Strategy Model:** Pit **now** — window pressure peaks this lap ({_peak_pressure}/100)")
+                else:
+                    st.info(f"**Pit Strategy Model:** Optimal pit in **{_laps_to_optimal} lap(s)** (lap {_optimal_lap}) · pressure peaks at {_peak_pressure}/100")
 
         # Compound What-If
         st.markdown("**Strategy Scenarios — If You Pit Now**")

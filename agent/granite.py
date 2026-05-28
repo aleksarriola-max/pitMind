@@ -428,7 +428,10 @@ def pitwall_chat(question: str, lap_context: dict, driver: str, mode: str) -> st
         f"Question: {question}"
     )
     system_prompt = ENGINEER_SYSTEM_PROMPT if mode == "engineer" else FAN_SYSTEM_PROMPT
-    return _call_granite(user_prompt, system_prompt)
+    result = _call_granite(user_prompt, system_prompt)
+    if result:
+        return result
+    return f"Analysis unavailable — review tyre age, gap ahead, and pit pressure for {driver} manually."
 
 
 def error_summary(error_log: list, driver: str, mode: str = "fan") -> str:
@@ -609,4 +612,78 @@ def h2h_narrative(
         return (
             f"H2H: {driver_a} avg_finish={a_finish} vs {driver_b} avg_finish={b_finish}. "
             f"Edge: {edge}. Full stats above."
+        )
+
+
+def strategy_recommendation(
+    scenarios: list,
+    driver: str,
+    current_lap: int,
+    mode: str = "fan",
+) -> str:
+    """Narrative explaining the recommended pit strategy scenario.
+
+    scenarios: output of compare_pit_scenarios() — list of scenario dicts each with
+               keys: label, pit_lap, projected_position, position_delta, recommendation.
+    """
+    if not scenarios:
+        if mode == "fan":
+            return (f"The data couldn't project a clear strategy for {driver} right now "
+                    "— the picture should sharpen in a lap or two.")
+        return f"{driver}: insufficient scenario data at lap {current_lap} — projection unavailable."
+
+    recommended = next((s for s in scenarios if s.get("recommendation")), scenarios[0])
+    label    = recommended["label"]
+    proj_pos = recommended["projected_position"]
+    delta    = recommended["position_delta"]
+    pit_lap  = recommended.get("pit_lap")
+
+    scenario_summary = " | ".join(
+        f"{s['label']}→P{s['projected_position']}(Δ{s['position_delta']:+d})"
+        for s in scenarios
+    )
+
+    if mode == "fan":
+        prompt = (
+            f"Driver: {driver} | Current lap: {current_lap}\n"
+            f"Best strategy: {label}"
+            + (f" (pit at lap {pit_lap})" if pit_lap else "") + "\n"
+            f"Projected position: P{proj_pos} | Position gain: {delta:+d}\n"
+            f"All scenarios: {scenario_summary}\n\n"
+            "Write 2-3 exciting sentences explaining the recommended strategy in plain English. "
+            "Refer to tyres, track position, and what this means for the race."
+        )
+    else:
+        prompt = (
+            f"Driver: {driver} | Lap: {current_lap}\n"
+            f"Scenario analysis: {scenario_summary}\n"
+            f"Recommended: {label}"
+            + (f" | pit_lap={pit_lap}" if pit_lap else "") + "\n"
+            f"Projected: P{proj_pos} | Δpos={delta:+d}\n\n"
+            "Write 2-3 sentences of engineer-mode analysis: lead with the dominant signal, "
+            "state the recommendation and projected outcome numerically."
+        )
+
+    result = _call_granite(prompt, _system_prompt(mode))
+    if result:
+        return result
+
+    # Fallback (Granite unavailable)
+    if mode == "fan":
+        if delta > 0:
+            positions_word = f"{abs(delta)} position{'s' if abs(delta) != 1 else ''}"
+            return (f"The data says {label.lower()} is the move — {driver} should gain "
+                    f"{positions_word}, projecting to P{proj_pos} over the next 15 laps.")
+        elif delta == 0:
+            return (f"{label} keeps {driver} at P{proj_pos} "
+                    "— no scenario offers a clear advantage right now.")
+        else:
+            return (f"All scenarios look difficult for {driver} here. "
+                    f"{label} is the least costly option, projecting P{proj_pos}.")
+    else:
+        return (
+            f"Scenario analysis: {scenario_summary}. "
+            f"Recommendation: {label}"
+            + (f" → pit_lap={pit_lap}" if pit_lap else "")
+            + f" | projected P{proj_pos} (Δ{delta:+d})."
         )

@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from models.constants import PIT_LANE_DELTA, DEFAULT_PIT_LANE_DELTA
 
 
 def forecast_positions(df: pd.DataFrame, from_lap: int, n_laps: int = 15) -> tuple[pd.DataFrame, list[dict]]:
@@ -138,3 +139,146 @@ def get_aggression_zone_stats(df: pd.DataFrame) -> pd.DataFrame:
         if col not in result.columns:
             result[col] = 0
     return result[["Early", "Mid", "Late"]].reset_index()
+
+
+def compare_pit_scenarios(
+    df: pd.DataFrame,
+    race_slug: str,
+    from_lap: int,
+    driver: str,
+    n_laps: int = 15,
+) -> list[dict]:
+    """Run 4 pit timing scenarios forward from from_lap and compare outcomes.
+
+    Scenarios: Pit Now (offset 0), Pit +3, Pit +5, Stay Out.
+
+    For each pit scenario:
+      - At the pit lap, the driver's gap_ahead increases by the circuit's pit lane
+        delta (they re-enter behind their pre-pit position).
+      - tyre_age resets to 0 and pace_delta resets to 0 for the pit lap and the
+        next 5 laps (fresh-tyre honeymoon period).
+      - forecast_positions() is then run on this modified DataFrame.
+
+    Returns a list of 4 dicts:
+        label              str   — "Pit Now" / "Pit +3" / "Pit +5" / "Stay Out"
+        pit_lap            int|None — actual lap number of the pit stop (None for Stay Out)
+        projected_position int   — projected P at from_lap + n_laps
+        projected_gap_ahead float|None
+        position_delta     int   — current_position - projected_position (positive = gained)
+        recommendation     bool  — True for the single best scenario
+
+    Returns [] if driver not in df["driver"].
+    """
+    if driver not in df["driver"].unique():
+        return []
+
+    pit_delta_s = PIT_LANE_DELTA.get(race_slug, DEFAULT_PIT_LANE_DELTA)
+
+    # Snap from_lap to nearest available lap
+    snap = df[df["lap"] == from_lap]
+    if len(snap) == 0:
+        available = df["lap"].unique()
+        from_lap = int(available[np.argmin(np.abs(available - from_lap))])
+        snap = df[df["lap"] == from_lap]
+
+    driver_snap = snap[snap["driver"] == driver]
+    if len(driver_snap) == 0:
+        return []
+
+    current_pos_val = driver_snap["position"].iloc[0]
+    current_position = int(current_pos_val) if pd.notna(current_pos_val) else 10
+
+    # (label, pit_offset)  — None offset means no pit stop
+    scenario_defs = [
+        ("Pit Now",  0),
+        ("Pit +3",   3),
+        ("Pit +5",   5),
+        ("Stay Out", None),
+    ]
+
+    results = []
+
+    for label, offset in scenario_defs:
+        try:
+            scenario_df = df.copy()
+
+            if offset is not None:
+                pit_lap = from_lap + offset
+                pit_mask = (scenario_df["driver"] == driver) & (scenario_df["lap"] == pit_lap)
+
+                if pit_mask.any():
+                    existing_gap = scenario_df.loc[pit_mask, "gap_ahead"].values[0]
+                    if pd.isna(existing_gap):
+                        existing_gap = 2.0
+                    # Re-entry: driver loses pit_lane_delta seconds to the car ahead
+                    scenario_df.loc[pit_mask, "gap_ahead"] = float(existing_gap) + pit_delta_s
+                    scenario_df.loc[pit_mask, "tyre_age"] = 0
+                    scenario_df.loc[pit_mask, "pace_delta"] = 0.0
+
+                    # Fresh-tyre honeymoon: 5 laps of 0 pace_delta post-pit
+                    post_pit_mask = (
+                        (scenario_df["driver"] == driver)
+                        & (scenario_df["lap"] > pit_lap)
+                        & (scenario_df["lap"] <= pit_lap + 5)
+                    )
+                    if post_pit_mask.any():
+                        post_laps = scenario_df.loc[post_pit_mask, "lap"]
+                        scenario_df.loc[post_pit_mask, "tyre_age"] = (post_laps - pit_lap).values
+                        scenario_df.loc[post_pit_mask, "pace_delta"] = 0.0
+            else:
+                pit_lap = None
+
+            proj_df, _ = forecast_positions(scenario_df, from_lap=from_lap, n_laps=n_laps)
+
+            end_lap = from_lap + n_laps
+            driver_proj = proj_df[
+                (proj_df["driver"] == driver) & (proj_df["lap"] == end_lap)
+            ]
+
+            if len(driver_proj) == 0:
+                # Fewer laps available — take last projected row for this driver
+                driver_proj = proj_df[proj_df["driver"] == driver].sort_values("lap").tail(1)
+
+            if len(driver_proj) == 0:
+                projected_position = current_position
+                projected_gap_ahead = None
+            else:
+                proj_row = driver_proj.iloc[0]
+                projected_position = int(proj_row["projected_position"])
+                gap_val = proj_row.get("projected_gap_ahead", np.nan)
+                projected_gap_ahead = (
+                    round(float(gap_val), 3) if pd.notna(gap_val) else None
+                )
+
+            results.append({
+                "label":               label,
+                "pit_lap":             int(pit_lap) if pit_lap is not None else None,
+                "projected_position":  projected_position,
+                "projected_gap_ahead": projected_gap_ahead,
+                "position_delta":      current_position - projected_position,
+                "recommendation":      False,
+            })
+
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                f"compare_pit_scenarios: scenario '{label}' failed: {e}"
+            )
+            results.append({
+                "label":               label,
+                "pit_lap":             int(from_lap + offset) if offset is not None else None,
+                "projected_position":  current_position,
+                "projected_gap_ahead": None,
+                "position_delta":      0,
+                "recommendation":      False,
+            })
+
+    # Best: most positions gained; tiebreak = latest pit lap (preserve track position longer)
+    if results:
+        best = max(
+            results,
+            key=lambda s: (s["position_delta"], -(s["pit_lap"] if s["pit_lap"] is not None else 0))
+        )
+        best["recommendation"] = True
+
+    return results

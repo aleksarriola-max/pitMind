@@ -337,6 +337,66 @@ def load_models() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Validation metrics
+# ---------------------------------------------------------------------------
+
+def _compute_validation_metrics(df: pd.DataFrame, predictor, feature_names: list) -> dict:
+    """Chronological 80/20 split validation. Logs accuracy/precision/recall per target.
+
+    First N-1 races = train set, last race = validation set.
+    Metrics are build-time only — logged to console, saved to models/saved/soul_metrics.json.
+    Returns empty dict if insufficient data.
+    """
+    from sklearn.metrics import accuracy_score, precision_score, recall_score
+
+    if "race_slug" not in df.columns:
+        log.warning("race_slug column missing — skipping validation metrics")
+        return {}
+
+    race_order = sorted(df["race_slug"].unique().tolist())
+    if len(race_order) < 2:
+        log.warning("Need at least 2 races for validation split — skipping metrics")
+        return {}
+
+    train_slugs = race_order[:-1]
+    val_slug    = race_order[-1]
+
+    train_df = df[df["race_slug"].isin(train_slugs)]
+    val_df   = df[df["race_slug"] == val_slug]
+
+    available_features = [c for c in feature_names if c in val_df.columns]
+    target_cols  = ["_target_gain", "_target_loss", "_target_pit"]
+    target_names = ["position_gain", "position_loss", "pit"]
+
+    val_clean = val_df.dropna(subset=available_features + target_cols)
+    if len(val_clean) < 10:
+        log.warning(f"Only {len(val_clean)} clean validation rows — skipping metrics")
+        return {}
+
+    X_val = val_clean[available_features].fillna(0).values
+    y_val = val_clean[target_cols].values
+
+    try:
+        proba = predictor.predict_proba(X_val)
+        metrics = {}
+        for i, name in enumerate(target_names):
+            y_pred = (proba[i][:, 1] >= 0.5).astype(int)
+            y_true = y_val[:, i].astype(int)
+            metrics[name] = {
+                "accuracy":       round(float(accuracy_score(y_true, y_pred)), 4),
+                "precision":      round(float(precision_score(y_true, y_pred, zero_division=0)), 4),
+                "recall":         round(float(recall_score(y_true, y_pred, zero_division=0)), 4),
+                "n_val_samples":  int(len(y_true)),
+                "val_race":       val_slug,
+                "train_races":    train_slugs,
+            }
+        return metrics
+    except Exception as e:
+        log.warning(f"Validation metrics computation failed: {e}")
+        return {}
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -357,6 +417,17 @@ def fit_and_save(all_data: pd.DataFrame) -> str:
 
     log.info("Fitting multi-target XGBoost predictor...")
     predictor, feature_names = fit_predictor(all_data)
+
+    # Validation metrics — build-time only, not used in production app
+    if predictor is not None:
+        _metrics = _compute_validation_metrics(all_data, predictor, feature_names)
+        if _metrics:
+            import json as _json
+            _mpath = os.path.join(MODELS_DIR, "soul_metrics.json")
+            with open(_mpath, "w") as _f:
+                _json.dump(_metrics, _f, indent=2)
+            log.info(f"Driver Soul validation metrics saved to {_mpath}")
+            log.info(_json.dumps(_metrics, indent=2))
 
     log.info("Building SHAP explainer...")
     feature_cols = TRAIT_COLS + ["tyre_age", "gap_ahead", "gap_behind", "pit_window_pressure", "lap_time"]

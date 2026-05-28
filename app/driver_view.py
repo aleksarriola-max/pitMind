@@ -204,7 +204,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
     st.divider()
     if mode == "engineer":
         st.markdown("**SHAP — What's driving the position gain prediction?**")
-        shap_vals = _get_shap_for_lap(driver, lap, df["race"].iloc[0].lower().replace(" ", "_"))
+        shap_vals = _get_shap_for_lap(driver, lap, race_slug)
         if shap_vals:
             fig_shap = _shap_bars(shap_vals)
             if fig_shap:

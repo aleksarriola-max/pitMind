@@ -187,7 +187,9 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
             _sc_cols = st.columns(4)
             for _i, _sc in enumerate(_scenarios):
                 with _sc_cols[_i]:
-                    _delta = _sc["position_delta"]
+                    _delta = _sc.get("position_delta", 0)
+                    if pd.isna(_delta):
+                        _delta = 0
                     _delta_str = f"+{_delta}" if _delta > 0 else str(_delta)
                     _delta_color = "normal" if _delta == 0 else ("inverse" if _delta > 0 else "off")
                     if _sc["recommendation"]:
@@ -284,10 +286,14 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 _ah_compound = str(_ah.get("tyre_compound", "?")) if pd.notna(_ah.get("tyre_compound")) else "?"
                 _ah_hist = df[(df["driver"] == _ah_driver) & (df["lap"] >= lap - 3) & (df["lap"] <= lap)]
                 if len(_ah_hist) >= 2:
-                    _ah_trend = float(_ah_hist.sort_values("lap")["pit_window_pressure"].diff().mean())
-                    _trend_str = (f"rising {_ah_trend:+.0f}/lap" if _ah_trend > 1
-                                  else f"falling {_ah_trend:+.0f}/lap" if _ah_trend < -1
-                                  else "stable")
+                    _ah_trend_val = _ah_hist.sort_values("lap")["pit_window_pressure"].diff().mean()
+                    if pd.isna(_ah_trend_val):
+                        _trend_str = "—"
+                    else:
+                        _ah_trend = float(_ah_trend_val)
+                        _trend_str = (f"rising {_ah_trend:+.0f}/lap" if _ah_trend > 1
+                                      else f"falling {_ah_trend:+.0f}/lap" if _ah_trend < -1
+                                      else "stable")
                 else:
                     _trend_str = "—"
                 _urg_color = "🔴" if _ah_pressure >= 75 else ("🟡" if _ah_pressure >= 50 else "🟢")

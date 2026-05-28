@@ -60,7 +60,7 @@ def compute_season_stats(all_race_dfs: dict) -> pd.DataFrame:
         d["races_counted"] = len(grp)
         d["avg_finish"] = round(grp["finish_position"].dropna().mean(), 1) if grp["finish_position"].notna().any() else None
         d["avg_grid"] = round(grp["grid_position"].dropna().mean(), 1) if grp["grid_position"].notna().any() else None
-        d["avg_positions_gained"] = round(grp["positions_gained"].mean(), 1)
+        d["avg_positions_gained"] = round(grp["positions_gained"].dropna().mean(), 1) if grp["positions_gained"].notna().any() else None
         d["best_lap_time"] = round(grp["best_lap_time"].dropna().min(), 3) if grp["best_lap_time"].notna().any() else None
         d["avg_pace_delta"] = round(grp["avg_pace_delta"].dropna().mean(), 3) if grp["avg_pace_delta"].notna().any() else None
 

@@ -59,6 +59,8 @@ def get_radio_clips(session) -> list[dict]:
 
             if audio is None:
                 continue
+            if radio_time is None:
+                continue
 
             radio_sec = radio_time.total_seconds() if hasattr(radio_time, "total_seconds") else 0
 

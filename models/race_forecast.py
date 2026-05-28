@@ -32,7 +32,7 @@ def forecast_positions(df: pd.DataFrame, from_lap: int, n_laps: int = 15) -> tup
     # Build state arrays: position, gap_ahead (to car ahead), pace_delta
     positions = {row["driver"]: int(row["position"]) if pd.notna(row["position"]) else i + 1
                  for i, (_, row) in enumerate(snap.iterrows())}
-    gaps = {row["driver"]: float(row["gap_ahead"]) if pd.notna(row.get("gap_ahead")) and row.get("gap_ahead") != 0 else 2.0
+    gaps = {row["driver"]: float(row["gap_ahead"]) if pd.notna(row.get("gap_ahead")) else 2.0
             for _, row in snap.iterrows()}
     pace = {row["driver"]: float(row["pace_delta"]) if pd.notna(row.get("pace_delta")) else 0.0
             for _, row in snap.iterrows()}

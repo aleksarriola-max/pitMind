@@ -601,7 +601,7 @@ def h2h_narrative(
 
     a_finish = stats_a.get("avg_finish", 10)
     b_finish = stats_b.get("avg_finish", 10)
-    edge = driver_a if (a_finish or 20) < (b_finish or 20) else driver_b
+    edge = driver_a if (a_finish if a_finish is not None else 20) < (b_finish if b_finish is not None else 20) else driver_b
     other = driver_b if edge == driver_a else driver_a
     if mode == "fan":
         return (

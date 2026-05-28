@@ -45,6 +45,8 @@ DRIVERS = ["VER", "HAM", "LEC", "SAI", "ALO", "PER", "NOR", "RUS"]
 
 def _norm(s: pd.Series, lo: float = 0.0, hi: float = 1.0) -> pd.Series:
     """Min-max normalize a series, clip to [lo, hi], scale to 0-100."""
+    if s.isna().all():
+        return pd.Series(50.0, index=s.index)
     mn, mx = s.min(), s.max()
     if mx == mn:
         return pd.Series(50.0, index=s.index)
@@ -129,9 +131,9 @@ def engineer_traits(df: pd.DataFrame) -> pd.DataFrame:
         restart_idxs = sc_col[sc_col.shift(1, fill_value=False) & ~sc_col].index
         restart_gain = pd.Series(50.0, index=grp.index)
         for idx in restart_idxs:
-            if idx + 1 < len(grp):
-                prev_lt = grp.loc[idx, "lap_time"] if idx in grp.index else np.nan
-                curr_lt = grp.loc[idx + 1, "lap_time"] if idx + 1 in grp.index else np.nan
+            if idx + 1 in grp.index:
+                prev_lt = grp.loc[idx, "lap_time"]
+                curr_lt = grp.loc[idx + 1, "lap_time"]
                 if pd.notna(prev_lt) and pd.notna(curr_lt) and prev_lt > 0:
                     gain = (prev_lt - curr_lt) / prev_lt * 100
                     restart_gain.loc[idx + 1] = min(100, max(0, gain * 10 + 50))
@@ -456,7 +458,9 @@ def add_predictions_to_race(df: pd.DataFrame) -> pd.DataFrame:
         X = df[available].fillna(0).values
         try:
             proba = predictor.predict_proba(X)
-            # MultiOutputClassifier returns list of (n, 2) arrays
+            # MultiOutputClassifier returns list of (n, 2) arrays — one per output head
+            if len(proba) < 3:
+                raise ValueError(f"Predictor returned {len(proba)} output heads, expected 3+")
             df["position_gain_prob"] = np.round([p[1] for p in proba[0]], 3)
             df["position_loss_prob"] = np.round([p[1] for p in proba[1]], 3)
             df["pit_prob"] = np.round([p[1] for p in proba[2]], 3)

@@ -455,7 +455,7 @@ def _grid_finish_df(all_dfs: dict[str, pd.DataFrame]) -> pd.DataFrame:
         if "grid_position" not in df.columns:
             continue
         for driver, grp in df.groupby("driver"):
-            grid = grp["grid_position"].iloc[0] if pd.notna(grp["grid_position"].iloc[0]) else None
+            grid = grp["grid_position"].iloc[0] if len(grp) > 0 and pd.notna(grp["grid_position"].iloc[0]) else None
             final_pos = grp["position"].dropna()
             finish = int(final_pos.iloc[-1]) if len(final_pos) > 0 else None
             if grid and finish:
@@ -549,7 +549,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                                    index=avail_drivers.index(driver) if driver in avail_drivers else 0,
                                    key="sector_drv_a")
         drv_b = sc_col2.selectbox("Driver B", avail_drivers,
-                                   index=min(1, len(avail_drivers) - 1),
+                                   index=min(1, len(avail_drivers) - 1) if len(avail_drivers) > 1 else 0,
                                    key="sector_drv_b")
 
         sector_cols = [c for c in ["sector1_time", "sector2_time", "sector3_time"] if c in df.columns]

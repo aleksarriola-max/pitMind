@@ -111,7 +111,7 @@ with st.sidebar:
     driver = st.selectbox(
         "Driver",
         options=DRIVERS,
-        index=DRIVERS.index(st.session_state.selected_driver),
+        index=DRIVERS.index(st.session_state.selected_driver) if st.session_state.selected_driver in DRIVERS else 0,
         key="driver_selector",
     )
     if driver != st.session_state.selected_driver:

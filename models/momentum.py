@@ -22,6 +22,8 @@ CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ca
 
 def _normalize_series(s: pd.Series, invert: bool = False) -> pd.Series:
     """Normalize a series to [0, 1]. Optionally invert (high raw = low score)."""
+    if s.isna().all():
+        return pd.Series(0.5, index=s.index)
     mn, mx = s.min(), s.max()
     if mx == mn:
         return pd.Series(0.5, index=s.index)

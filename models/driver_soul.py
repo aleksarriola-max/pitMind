@@ -106,7 +106,7 @@ def engineer_traits(df: pd.DataFrame) -> pd.DataFrame:
             prev = 0
             for pit_lap in sorted(pit_laps):
                 window = grp[(grp["lap"] > prev) & (grp["lap"] <= pit_lap)]
-                if len(window) > 0:
+                if len(window) > 0 and window["pit_window_pressure"].notna().any():
                     opt = window.loc[window["pit_window_pressure"].idxmax(), "lap"]
                     optimal_laps.append((int(opt), int(pit_lap)))
                 prev = pit_lap

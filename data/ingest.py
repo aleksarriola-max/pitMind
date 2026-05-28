@@ -404,10 +404,12 @@ def build_race_dataframe(slug: str) -> pd.DataFrame:
 
 
 def save_race(df: pd.DataFrame, slug: str) -> str:
-    """Serialize the per-lap DataFrame to parquet."""
+    """Serialize the per-lap DataFrame to parquet (atomic write)."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     path = os.path.join(CACHE_DIR, f"{slug}.parquet")
-    df.to_parquet(path, index=False)
+    tmp_path = path + ".tmp"
+    df.to_parquet(tmp_path, index=False)
+    os.replace(tmp_path, path)
     log.info(f"Saved {len(df)} rows to {path}")
     return path
 

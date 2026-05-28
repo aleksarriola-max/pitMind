@@ -28,7 +28,7 @@ RACES = {
     "abudhabi_2025":    {"year": 2025, "round": 24, "name": "Abu Dhabi 2025", "openf1_circuit": "abu_dhabi"},
 }
 
-DRIVERS = ["VER", "HAM", "LEC", "SAI", "ALO", "PER", "NOR", "RUS"]
+DRIVERS = ["VER", "HAM", "LEC", "PIA", "ALO", "OCO", "NOR", "RUS"]
 
 os.makedirs(FASTF1_CACHE_DIR, exist_ok=True)
 fastf1.Cache.enable_cache(FASTF1_CACHE_DIR)

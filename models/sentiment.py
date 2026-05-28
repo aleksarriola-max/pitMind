@@ -15,7 +15,7 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
-DRIVERS = ["VER", "HAM", "LEC", "SAI", "ALO", "PER", "NOR", "RUS"]
+DRIVERS = ["VER", "HAM", "LEC", "PIA", "ALO", "OCO", "NOR", "RUS"]
 
 # Lazy-loaded globals — imported only when needed so the app doesn't require torch
 _whisper_model = None

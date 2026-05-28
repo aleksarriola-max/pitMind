@@ -36,7 +36,7 @@ TRAIT_COLS = [
     "undercut_susceptibility", "dirty_air_tolerance",
 ]
 PRED_COLS = ["position_gain_prob", "position_loss_prob", "pit_prob", "incident_risk"]
-DRIVERS = ["VER", "HAM", "LEC", "SAI", "ALO", "PER", "NOR", "RUS"]
+DRIVERS = ["VER", "HAM", "LEC", "PIA", "ALO", "OCO", "NOR", "RUS"]
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 from models.constants import PIT_LANE_DELTA, DEFAULT_PIT_LANE_DELTA, SC_PIT_LANE_DELTA
 
+# Module-level cache for quadratic degradation coefficients, populated by
+# get_compound_degradation_rates() and consumed by compare_pit_scenarios().
+_COMPOUND_POLY: dict = {}
+
 
 def forecast_positions(df: pd.DataFrame, from_lap: int, n_laps: int = 15) -> tuple[pd.DataFrame, list[dict]]:
     """
@@ -142,19 +146,27 @@ def get_aggression_zone_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_compound_degradation_rates(df: pd.DataFrame) -> dict:
-    """Compute per-compound pace degradation rate (s/lap) via linear regression.
+    """Per-compound degradation rate (s/lap) via quadratic regression.
 
-    Uses pace_delta ~ tyre_age regression per compound from the full race DataFrame.
-    Returns {compound: rate_per_lap} e.g. {"SOFT": 0.045, "MEDIUM": 0.025, "HARD": 0.012}
-    Floored at 0.005 s/lap to avoid negative (impossible) degradation.
+    Fits a degree-2 polynomial (a*t² + b*t + c) per compound to capture the
+    three tyre phases: warm-up (laps 1-3, pace improves), stable decline, and
+    cliff (late-stint acceleration). Returns the slope at lap 15 of a fresh
+    stint as the representative scalar rate, floored at 0.005 s/lap.
+
+    Also populates _COMPOUND_POLY with (a, b, c) coefficients for use in
+    compare_pit_scenarios() honeymoon simulation.
     """
     rates = {}
     for compound, group in df.groupby("tyre_compound"):
         clean = group[["tyre_age", "pace_delta"]].dropna()
         if len(clean) < 10:
             continue
-        coeffs = np.polyfit(clean["tyre_age"].values, clean["pace_delta"].values, 1)
-        rates[str(compound)] = float(max(coeffs[0], 0.005))
+        coeffs = np.polyfit(clean["tyre_age"].values, clean["pace_delta"].values, 2)
+        a, b = float(coeffs[0]), float(coeffs[1])
+        # d/dt(a*t² + b*t + c) at t=15 → representative mid-stint slope
+        slope_at_15 = 2 * a * 15 + b
+        rates[str(compound)] = float(max(slope_at_15, 0.005))
+        _COMPOUND_POLY[str(compound)] = (a, b, float(coeffs[2]))
     return rates
 
 
@@ -267,7 +279,12 @@ def compare_pit_scenarios(
                             & (scenario_df["lap"] == pit_lap + _hl)
                         )
                         if _hl_mask.any():
-                            scenario_df.loc[_hl_mask, "pace_delta"] = _fresh_pace + _rate * _hl
+                            if str(_tyre_cmp) in _COMPOUND_POLY:
+                                _a, _b, _c = _COMPOUND_POLY[str(_tyre_cmp)]
+                                _proj_pace = _fresh_pace + (_a * _hl ** 2 + _b * _hl)
+                            else:
+                                _proj_pace = _fresh_pace + _rate * _hl
+                            scenario_df.loc[_hl_mask, "pace_delta"] = _proj_pace
             else:
                 pit_lap = None
 
@@ -301,6 +318,10 @@ def compare_pit_scenarios(
                 "position_delta":      current_position - projected_position,
                 "recommendation":      False,
             })
+            # Attach trajectory for UI visualization (prefixed keys, not in schema)
+            _drv_traj = proj_df[proj_df["driver"] == driver].sort_values("lap")
+            results[-1]["_traj_laps"] = _drv_traj["lap"].tolist()
+            results[-1]["_traj_positions"] = _drv_traj["projected_position"].tolist()
 
         except Exception as e:
             import logging as _log

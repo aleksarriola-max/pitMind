@@ -165,6 +165,16 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
         c7.metric("Safety Car", "🟡 Active" if sc_active else "✅ Clear")
         c8.metric("Position", f"P{pos}")
 
+        # Driver Soul Model Confidence
+        st.markdown("**Driver Soul Model Confidence**")
+        _pit_p  = row.get("pit_prob", np.nan)
+        _gain_p = row.get("position_gain_prob", np.nan)
+        _risk_p = row.get("incident_risk", np.nan)
+        _ml1, _ml2, _ml3 = st.columns(3)
+        _ml1.metric("Model pit probability", f"{_pit_p:.0%}"  if pd.notna(_pit_p)  else "—")
+        _ml2.metric("Position gain (5L)",    f"{_gain_p:.0%}" if pd.notna(_gain_p) else "—")
+        _ml3.metric("Incident risk",         f"{_risk_p:.0%}" if pd.notna(_risk_p) else "—")
+
         # Pit Strategy Optimizer — Scenario Comparison Engine
         st.markdown("**Pit Strategy Optimizer — Scenario Analysis**")
         try:
@@ -193,6 +203,41 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                         delta_color=_delta_color,
                     )
             st.info(strategy_recommendation(_scenarios, driver, lap, mode))
+
+            # Scenario trajectory chart
+            if any("_traj_laps" in _sc for _sc in _scenarios):
+                _SCENARIO_COLORS = {
+                    "Pit Now": "#22C55E", "Pit +3": "#F59E0B",
+                    "Pit +5": "#3B82F6",  "Stay Out": "#EF4444",
+                }
+                _fig_traj = go.Figure()
+                for _sc in _scenarios:
+                    if "_traj_laps" not in _sc:
+                        continue
+                    _fig_traj.add_trace(go.Scatter(
+                        x=_sc["_traj_laps"],
+                        y=_sc["_traj_positions"],
+                        mode="lines+markers",
+                        name=f"{'★ ' if _sc['recommendation'] else ''}{_sc['label']}",
+                        line=dict(
+                            color=_SCENARIO_COLORS.get(_sc["label"], "#888"),
+                            width=3 if _sc["recommendation"] else 1.5,
+                            dash="solid" if _sc["recommendation"] else "dot",
+                        ),
+                        marker=dict(size=5),
+                    ))
+                _fig_traj.update_layout(
+                    paper_bgcolor="#0F0F0F", plot_bgcolor="#0F0F0F",
+                    font=dict(color="white"),
+                    xaxis=dict(title="Lap", gridcolor="#2A2A2A"),
+                    yaxis=dict(
+                        title="Projected Position", autorange="reversed",
+                        tickvals=list(range(1, 11)), gridcolor="#2A2A2A",
+                    ),
+                    height=260, margin=dict(l=50, r=20, t=20, b=40),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.01),
+                )
+                st.plotly_chart(_fig_traj, use_container_width=True)
 
         # Competitor Threat Analysis — engineer mode only
         st.markdown("**Competitor Threat Analysis**")
@@ -228,6 +273,28 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                     st.caption(f"Estimated DRS range in ~{_laps_to_drs:.0f} lap(s)")
             else:
                 st.caption("No driver directly behind — running last in group or P1")
+
+            # Car-ahead undercut signal: is the driver in front about to pit?
+            _ahead_rows = _all_snap[_all_snap["position"] == _drv_pos - 1]
+            if len(_ahead_rows) > 0:
+                _ah = _ahead_rows.iloc[0]
+                _ah_driver   = str(_ah["driver"])
+                _ah_pressure = float(_ah.get("pit_window_pressure", 50)) if pd.notna(_ah.get("pit_window_pressure")) else 50.0
+                _ah_age      = int(_ah.get("tyre_age", 0)) if pd.notna(_ah.get("tyre_age")) else 0
+                _ah_compound = str(_ah.get("tyre_compound", "?")) if pd.notna(_ah.get("tyre_compound")) else "?"
+                _ah_hist = df[(df["driver"] == _ah_driver) & (df["lap"] >= lap - 3) & (df["lap"] <= lap)]
+                if len(_ah_hist) >= 2:
+                    _ah_trend = float(_ah_hist.sort_values("lap")["pit_window_pressure"].diff().mean())
+                    _trend_str = (f"rising {_ah_trend:+.0f}/lap" if _ah_trend > 1
+                                  else f"falling {_ah_trend:+.0f}/lap" if _ah_trend < -1
+                                  else "stable")
+                else:
+                    _trend_str = "—"
+                _urg_color = "🔴" if _ah_pressure >= 75 else ("🟡" if _ah_pressure >= 50 else "🟢")
+                st.caption(
+                    f"**Car ahead: {_ah_driver}** — {_ah_compound} · {_ah_age} laps · "
+                    f"window pressure {_ah_pressure:.0f}/100 ({_trend_str}) {_urg_color}"
+                )
 
         else:
             # Fallback: original argmax display

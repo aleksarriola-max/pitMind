@@ -263,10 +263,11 @@ def pull_openf1(slug: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def merge_to_lap_df(fastf1_result: dict, openf1_result: dict, race_name: str,
-                    grid_positions: dict | None = None) -> pd.DataFrame:
+                    slug: str = "", grid_positions: dict | None = None) -> pd.DataFrame:
     """Merge FastF1 and OpenF1 data into the unified per-lap schema."""
     df = fastf1_result["lap_df"].copy()
     df["race"] = race_name
+    df["race_slug"] = slug
 
     # Grid position from qualifying (constant per driver per race)
     if grid_positions:
@@ -398,7 +399,7 @@ def build_race_dataframe(slug: str) -> pd.DataFrame:
     fastf1_result = pull_fastf1(race_info["year"], race_info["round"])
     openf1_result = pull_openf1(slug)
     grid_positions = pull_qualifying(race_info["year"], race_info["round"])
-    df = merge_to_lap_df(fastf1_result, openf1_result, race_info["name"], grid_positions)
+    df = merge_to_lap_df(fastf1_result, openf1_result, race_info["name"], slug=slug, grid_positions=grid_positions)
     return df
 
 

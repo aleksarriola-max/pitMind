@@ -4,7 +4,7 @@ import numpy as np
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.race_forecast import forecast_positions
+from models.race_forecast import forecast_positions, get_compound_degradation_rates
 
 
 def test_forecast_returns_correct_types(lap_df):
@@ -109,3 +109,60 @@ def test_compare_pit_scenarios_pit_now_increases_gap(lap_df):
     # Both should be valid ints
     assert isinstance(pit_now["projected_position"], int)
     assert isinstance(stay_out["projected_position"], int)
+
+
+@pytest.mark.skipif(not _HAS_SCENARIOS, reason="compare_pit_scenarios not yet implemented")
+def test_compare_pit_scenarios_sc_reduces_pit_cost(lap_df):
+    """Under Safety Car the pit cost should be ~5s, not the normal ~23s."""
+    sc_df = lap_df.copy()
+    # Mark lap 5 as SC active for all drivers
+    sc_df.loc[sc_df["lap"] == 5, "safety_car_active"] = True
+
+    # Normal race (no SC)
+    normal = compare_pit_scenarios(lap_df, "bahrain_2025", from_lap=5, driver="HAM", n_laps=10)
+    # SC active at pit lap
+    sc = compare_pit_scenarios(sc_df, "bahrain_2025", from_lap=5, driver="HAM", n_laps=10)
+
+    pit_now_normal = next(s for s in normal if s["label"] == "Pit Now")
+    pit_now_sc     = next(s for s in sc     if s["label"] == "Pit Now")
+
+    # SC scenario should project a better (lower) position number than the
+    # normal scenario, because the pit delta is ~5s not ~23s.
+    assert pit_now_sc["projected_position"] <= pit_now_normal["projected_position"], (
+        f"SC pit should project P{pit_now_sc['projected_position']} ≤ "
+        f"normal pit P{pit_now_normal['projected_position']}"
+    )
+
+
+def test_get_compound_degradation_rates_returns_dict(lap_df):
+    rates = get_compound_degradation_rates(lap_df)
+    assert isinstance(rates, dict)
+    # lap_df uses MEDIUM compound with enough rows — should produce a rate
+    assert "MEDIUM" in rates
+    assert rates["MEDIUM"] >= 0.005  # floored at minimum
+
+
+def test_get_compound_degradation_rates_floor(lap_df):
+    """Rate should never be negative (floored at 0.005)."""
+    # Artificially invert pace_delta so raw regression slope is negative
+    inv_df = lap_df.copy()
+    inv_df["pace_delta"] = -inv_df["tyre_age"].astype(float) * 0.1
+    rates = get_compound_degradation_rates(inv_df)
+    for compound, rate in rates.items():
+        assert rate >= 0.005, f"Compound {compound} rate {rate} is below floor"
+
+
+def test_get_compound_degradation_rates_skips_sparse_compound():
+    """Compounds with fewer than 10 rows should be skipped."""
+    rows = [{"driver": "VER", "team": "RBR", "lap": i, "position": 1.0,
+             "gap_ahead": float("nan"), "gap_behind": float("nan"),
+             "pace_delta": 0.01 * i, "radio_sentiment": 0.0, "pit_window_pressure": 40.0,
+             "tyre_age": i, "tyre_compound": "SOFT" if i <= 5 else "MEDIUM",
+             "lap_time": 90.0, "is_pit_in": False, "safety_car_active": False, "stint": 1}
+            for i in range(1, 25)]
+    df = pd.DataFrame(rows)
+    rates = get_compound_degradation_rates(df)
+    # SOFT has only 5 rows (<10 threshold) — must be absent
+    assert "SOFT" not in rates
+    # MEDIUM has 19 rows — must be present
+    assert "MEDIUM" in rates

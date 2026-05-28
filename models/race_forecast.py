@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from models.constants import PIT_LANE_DELTA, DEFAULT_PIT_LANE_DELTA
+from models.constants import PIT_LANE_DELTA, DEFAULT_PIT_LANE_DELTA, SC_PIT_LANE_DELTA
 
 
 def forecast_positions(df: pd.DataFrame, from_lap: int, n_laps: int = 15) -> tuple[pd.DataFrame, list[dict]]:
@@ -141,6 +141,23 @@ def get_aggression_zone_stats(df: pd.DataFrame) -> pd.DataFrame:
     return result[["Early", "Mid", "Late"]].reset_index()
 
 
+def get_compound_degradation_rates(df: pd.DataFrame) -> dict:
+    """Compute per-compound pace degradation rate (s/lap) via linear regression.
+
+    Uses pace_delta ~ tyre_age regression per compound from the full race DataFrame.
+    Returns {compound: rate_per_lap} e.g. {"SOFT": 0.045, "MEDIUM": 0.025, "HARD": 0.012}
+    Floored at 0.005 s/lap to avoid negative (impossible) degradation.
+    """
+    rates = {}
+    for compound, group in df.groupby("tyre_compound"):
+        clean = group[["tyre_age", "pace_delta"]].dropna()
+        if len(clean) < 10:
+            continue
+        coeffs = np.polyfit(clean["tyre_age"].values, clean["pace_delta"].values, 1)
+        rates[str(compound)] = float(max(coeffs[0], 0.005))
+    return rates
+
+
 def compare_pit_scenarios(
     df: pd.DataFrame,
     race_slug: str,
@@ -198,24 +215,43 @@ def compare_pit_scenarios(
 
     results = []
 
+    _deg_rates = get_compound_degradation_rates(df)
+    _tyre_cmp = str(driver_snap["tyre_compound"].iloc[0]) \
+                if "tyre_compound" in driver_snap.columns \
+                   and pd.notna(driver_snap["tyre_compound"].iloc[0]) \
+                else "MEDIUM"
+    _rate = _deg_rates.get(_tyre_cmp, 0.02)
+
     for label, offset in scenario_defs:
         try:
             scenario_df = df.copy()
 
             if offset is not None:
                 pit_lap = from_lap + offset
+                # Reduce pit cost under Safety Car
+                _effective_pit_delta = pit_delta_s
+                _sc_snap = scenario_df[
+                    (scenario_df["driver"] == driver) & (scenario_df["lap"] == pit_lap)
+                ]
+                if ("safety_car_active" in scenario_df.columns
+                        and len(_sc_snap) > 0
+                        and bool(_sc_snap["safety_car_active"].iloc[0])):
+                    _effective_pit_delta = SC_PIT_LANE_DELTA
                 pit_mask = (scenario_df["driver"] == driver) & (scenario_df["lap"] == pit_lap)
 
                 if pit_mask.any():
                     existing_gap = scenario_df.loc[pit_mask, "gap_ahead"].values[0]
                     if pd.isna(existing_gap):
                         existing_gap = 2.0
+                    _pre_pit_pace_val = scenario_df.loc[pit_mask, "pace_delta"].values[0]
+                    _pre_pit_pace = float(_pre_pit_pace_val) if pd.notna(_pre_pit_pace_val) else 0.0
+                    _fresh_pace = min(_pre_pit_pace, 0.0)
                     # Re-entry: driver loses pit_lane_delta seconds to the car ahead
-                    scenario_df.loc[pit_mask, "gap_ahead"] = float(existing_gap) + pit_delta_s
+                    scenario_df.loc[pit_mask, "gap_ahead"] = float(existing_gap) + _effective_pit_delta
                     scenario_df.loc[pit_mask, "tyre_age"] = 0
-                    scenario_df.loc[pit_mask, "pace_delta"] = 0.0
+                    scenario_df.loc[pit_mask, "pace_delta"] = _fresh_pace
 
-                    # Fresh-tyre honeymoon: 5 laps of 0 pace_delta post-pit
+                    # Fresh-tyre honeymoon: tyre_age reset for next 5 laps
                     post_pit_mask = (
                         (scenario_df["driver"] == driver)
                         & (scenario_df["lap"] > pit_lap)
@@ -224,7 +260,14 @@ def compare_pit_scenarios(
                     if post_pit_mask.any():
                         post_laps = scenario_df.loc[post_pit_mask, "lap"]
                         scenario_df.loc[post_pit_mask, "tyre_age"] = (post_laps - pit_lap).values
-                        scenario_df.loc[post_pit_mask, "pace_delta"] = 0.0
+                    # Per-compound degradation curve for pace_delta
+                    for _hl in range(1, 6):
+                        _hl_mask = (
+                            (scenario_df["driver"] == driver)
+                            & (scenario_df["lap"] == pit_lap + _hl)
+                        )
+                        if _hl_mask.any():
+                            scenario_df.loc[_hl_mask, "pace_delta"] = _fresh_pace + _rate * _hl
             else:
                 pit_lap = None
 

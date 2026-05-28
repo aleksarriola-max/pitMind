@@ -17,3 +17,4 @@ PIT_LANE_DELTA = {
 }
 
 DEFAULT_PIT_LANE_DELTA = 23.0  # fallback for any unrecognised circuit slug
+SC_PIT_LANE_DELTA = 5.0  # pit lane delta under Safety Car — all cars slow, cost is ~5s

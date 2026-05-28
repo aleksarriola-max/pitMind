@@ -193,6 +193,42 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                         delta_color=_delta_color,
                     )
             st.info(strategy_recommendation(_scenarios, driver, lap, mode))
+
+        # Competitor Threat Analysis — engineer mode only
+        st.markdown("**Competitor Threat Analysis**")
+        _all_snap = df[df["lap"] == lap].copy()
+        _drv_row = _all_snap[_all_snap["driver"] == driver]
+        if len(_drv_row) > 0:
+            _drv_pos = int(_drv_row["position"].iloc[0]) if pd.notna(_drv_row["position"].iloc[0]) else 99
+            _behind_rows = _all_snap[_all_snap["position"] == _drv_pos + 1]
+            if len(_behind_rows) > 0:
+                _threat = _behind_rows.iloc[0]
+                _t_driver   = str(_threat["driver"])
+                _t_gap      = float(gap_behind) if pd.notna(gap_behind) else None
+                _t_compound = str(_threat.get("tyre_compound", "?")) if pd.notna(_threat.get("tyre_compound")) else "?"
+                _t_age      = int(_threat.get("tyre_age", 0)) if pd.notna(_threat.get("tyre_age")) else 0
+                _t_pace     = float(_threat.get("pace_delta", 0)) if pd.notna(_threat.get("pace_delta")) else 0.0
+                _closing_rate = float(pace_delta) - _t_pace if pd.notna(pace_delta) else 0.0
+                if _t_gap is not None and _closing_rate > 0.01:
+                    _laps_to_drs = max(0.0, (_t_gap - 1.0) / _closing_rate)
+                    _threat_level = "🔴 High" if _laps_to_drs < 3 else ("🟡 Moderate" if _laps_to_drs < 8 else "🟢 Low")
+                elif _t_gap is not None and _t_gap < 1.0:
+                    _threat_level = "🔴 High — DRS range now"
+                    _laps_to_drs = 0.0
+                else:
+                    _threat_level = "🟢 Low"
+                    _laps_to_drs = None
+                _tc1, _tc2 = st.columns([3, 1])
+                _tc1.markdown(
+                    f"**{_t_driver}** — {_t_compound} · {_t_age} laps"
+                    + (f" · {_t_gap:.2f}s behind · closing {_closing_rate:.2f}s/lap" if _t_gap else "")
+                )
+                _tc2.markdown(f"**{_threat_level}**")
+                if _laps_to_drs is not None and _laps_to_drs < 8:
+                    st.caption(f"Estimated DRS range in ~{_laps_to_drs:.0f} lap(s)")
+            else:
+                st.caption("No driver directly behind — running last in group or P1")
+
         else:
             # Fallback: original argmax display
             _drv_full = df[df["driver"] == driver].sort_values("lap")
@@ -229,9 +265,13 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 # Estimate re-entry pace delta: fresh tyres = boost vs current degraded pace
                 fresh_delta = pace_delta + params["pace_boost"]  # negative = faster than field
                 # Estimate if we undercut the car ahead
-                if pd.notna(gap_ahead) and pd.notna(pace_delta) and pace_delta > 0:
-                    laps_to_close = gap_ahead / max(pace_delta - fresh_delta, 0.01)
-                    can_undercut = laps_to_close < 8
+                if pd.notna(gap_ahead) and pd.notna(pace_delta):
+                    pace_gain_per_lap = pace_delta - fresh_delta   # positive = fresh tyres are faster
+                    if pace_gain_per_lap > 0.01:
+                        laps_to_close = gap_ahead / pace_gain_per_lap
+                        can_undercut = laps_to_close < 8
+                    else:
+                        can_undercut = False
                 else:
                     can_undercut = False
                 # Estimate if car behind will undercut us

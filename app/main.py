@@ -78,7 +78,7 @@ def get_race_df(slug: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def get_shifts(slug: str) -> list:
-    return load_shifts(slug)
+    return [s for s in load_shifts(slug) if s.get("driver") in DRIVERS]
 
 
 # ---------------------------------------------------------------------------

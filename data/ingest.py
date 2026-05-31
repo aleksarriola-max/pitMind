@@ -181,8 +181,8 @@ def _extract_sc_laps(session) -> set:
 # ---------------------------------------------------------------------------
 
 OPENF1_DRIVER_NUMS = {
-    "VER": "1", "HAM": "44", "LEC": "16", "SAI": "55",
-    "ALO": "14", "PER": "11", "NOR": "4", "RUS": "63",
+    "VER": "1", "HAM": "44", "LEC": "16", "PIA": "81",
+    "ALO": "14", "OCO": "31", "NOR": "4", "RUS": "63",
 }
 
 _session_key_cache: dict[str, int] = {}

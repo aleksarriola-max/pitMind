@@ -93,7 +93,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                 lambda x: f"{x:.1f}" if pd.notna(x) else "—"
             )
 
-        st.dataframe(leaderboard, width='stretch', height=320, hide_index=True)
+        st.dataframe(leaderboard, use_container_width=True, height=320, hide_index=True)
 
     st.divider()
 
@@ -173,7 +173,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                     winner = driver_a if va > vb else driver_b
                 rows.append({"Metric": label, driver_a: f"{float(va):.1f}", driver_b: f"{float(vb):.1f}", "Edge": winner})
             if rows:
-                st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -284,7 +284,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
 
                 if rows:
                     team_df = pd.DataFrame(rows)
-                    st.dataframe(team_df, width='stretch', hide_index=True)
+                    st.dataframe(team_df, use_container_width=True, hide_index=True)
 
                     # Win count summary
                     wins_a = sum(1 for r in rows if r["Edge"].startswith(drv_a))

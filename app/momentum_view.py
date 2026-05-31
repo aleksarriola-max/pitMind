@@ -299,7 +299,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
                                 "Δ": f"{delta:+.2f}",
                             })
                         if sig_rows:
-                            st.dataframe(pd.DataFrame(sig_rows), hide_index=True, width='stretch')
+                            st.dataframe(pd.DataFrame(sig_rows), hide_index=True, use_container_width=True)
         else:
             st.info("No significant momentum shifts detected for the selected drivers.")
 

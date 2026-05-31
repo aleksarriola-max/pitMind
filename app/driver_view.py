@@ -198,7 +198,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
         st.plotly_chart(fig_pred, width='stretch')
         if mode == "engineer":
             pred_rows = [{"Outcome": PRED_LABELS.get(c, c), "Probability": f"{lap_state.get(c, 0):.1%}"} for c in PRED_COLS]
-            st.dataframe(pd.DataFrame(pred_rows), hide_index=True, width='stretch')
+            st.dataframe(pd.DataFrame(pred_rows), hide_index=True, use_container_width=True)
 
     # SHAP (engineer only)
     st.divider()

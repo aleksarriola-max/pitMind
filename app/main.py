@@ -155,12 +155,15 @@ with st.sidebar:
             st.session_state.pit_decision = None
             st.rerun()
 
-    # Sync state to URL for shareable links
-    st.query_params.update({
+    # Sync state to URL — only write when params have actually changed
+    # to avoid st.query_params.update() triggering a rerun loop
+    _desired_qp = {
         "race": st.session_state.selected_race,
         "driver": st.session_state.selected_driver,
         "lap": str(st.session_state.selected_lap),
-    })
+    }
+    if dict(st.query_params) != _desired_qp:
+        st.query_params.update(_desired_qp)
 
     st.divider()
     st.caption("Built with FastF1 · OpenF1 · IBM Granite · scikit-learn · XGBoost · SHAP")

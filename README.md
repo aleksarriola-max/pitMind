@@ -3,7 +3,7 @@
 > Bridging the gap between the pit wall and the grandstand — powered by IBM Granite AI
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B)](https://pitmind-bvihgej8qmkzrergphk4xb.streamlit.app/)
-[![IBM Granite](https://img.shields.io/badge/IBM-Granite%20AI-0043CE)](https://www.ibm.com/watsonx)
+[![IBM Granite](https://img.shields.io/badge/IBM-Granite%204-0043CE)](https://www.ibm.com/watsonx)
 [![Built with Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B)](https://streamlit.io)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://python.org)
 
@@ -36,6 +36,8 @@ The app has two modes toggled by a single switch:
 | Granite narrates the story | Granite explains the data |
 
 Both modes are powered by **IBM Granite AI** generating contextual narratives matched to the audience — same model, same data, radically different output.
+
+**2025 drivers covered:** VER · HAM · LEC · PIA · ALO · OCO · NOR · RUS — the real top 8 from the 2025 season, including championship winner Norris and runner-up Piastri.
 
 ---
 
@@ -78,7 +80,7 @@ FastF1 (official F1 library)    OpenF1 API (real-time)
   Pre-computed .parquet cache → sub-second Streamlit loads
 ```
 
-**5 races, 2025 season:** Bahrain, Monaco, Silverstone, Monza, Abu Dhabi
+**5 races, 2025 season:** Bahrain (R4) · Monaco (R8) · Silverstone (R12) · Monza (R16) · Abu Dhabi (R24)
 
 ### System Architecture
 
@@ -95,11 +97,12 @@ FastF1 (official F1 library)    OpenF1 API (real-time)
 │  Driver Soul: 11 traits → UMAP fingerprint → XGBoost 4-target   │
 │  Error Detection: 5-type incident classifier                     │
 │  Race Forecast: gap + pace Δ → 15-lap position projection        │
+│  Tyre Degradation: quadratic polynomial fit per compound         │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
 │                        AI LAYER (IBM Granite)                    │
-│  granite-4-h-small · 9 functions · dual system prompts          │
+│  granite-4-h-small · 8 functions · dual system prompts          │
 │  Fan voice ←→ Engineer voice from same model + same data        │
 │  Conversational chat interface with lap telemetry context        │
 └────────────────────────────┬────────────────────────────────────┘
@@ -135,11 +138,16 @@ FastF1 (official F1 library)    OpenF1 API (real-time)
 │  Shift detection: sliding-window peak comparison          │
 └─────────────────────────────────────────────────────────┘
 ┌─────────────────────────────────────────────────────────┐
+│               Race Forecast Model                         │
+│  Quadratic tyre degradation per compound (warm-up,       │
+│    stable, cliff phases) · 4 pit timing scenarios        │
+│  Lap-by-lap trajectory projection with overtake sim      │
+│  Safety Car cost reduction (23s → 5s under SC)           │
+└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
 │               Supporting Models                           │
 │  Error Detection: 5 types — lockup, pace collapse,       │
 │    late pit, SC loss, radio stress                        │
-│  Race Forecast: 15-lap position projection from          │
-│    pace delta + gap trajectory                            │
 │  Sentiment Pipeline: Whisper → TextBlob per lap          │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -160,6 +168,7 @@ Engineer mode adds: shift magnitude table, per-shift signal causation breakdown 
 Each driver gets a behavioral fingerprint — an 11-dimension radar chart built purely from telemetry analysis. No subjective scoring; every trait is a derived signal from lap time variance, braking data, gap dynamics, and radio sentiment.
 
 Live state panel shows trait scores at any selected lap. Engineer mode adds:
+- **Driver Soul Model Confidence** — three live ML predictions: pit probability, position gain probability, and incident risk at the selected lap
 - SHAP feature importance bar chart
 - Radio sentiment trend across the race
 - Incident risk trend line
@@ -169,13 +178,19 @@ Live state panel shows trait scores at any selected lap. Engineer mode adds:
 The interactive centrepiece. The user sees the same data the pit wall sees at a selected lap — tyre compound/age, gap ahead/behind, pace delta, pit window pressure, weather, safety car status.
 
 **Fan mode:** qualitative cards ("tyres getting worn", "DRS range — under attack")
-**Engineer mode:** raw numbers + pit strategy model recommendation ("optimal pit in 3 laps — pressure peaks at 84/100")
 
-The user makes their call (**Pit Now** / **Stay Out**), then sees the outcome reveal: what the team actually did, how positions evolved over the next 5 laps, the Driver Soul model's pit probability at that moment, and IBM Granite's narrative of the decision. Engineer mode adds a pit window pressure overlay chart showing the full-race pressure curve with actual pit laps marked.
+**Engineer mode:** raw numbers + the full strategic decision suite:
+- **Driver Soul Model Confidence** row — pit probability, position gain, incident risk from the XGBoost model
+- **4 pit timing scenarios** (Pit Now / Pit +3 / Pit +5 / Stay Out) with projected position, positions gained/lost, and the recommended call
+- **Scenario trajectory chart** — Plotly line chart showing how each scenario's projected position evolves lap by lap, with the recommended scenario highlighted in bold
+- **Competitor threat panel** — car directly behind, their tyre age and pressure trend
+- **Car-ahead undercut signal** — the driver in front's compound, age, pit window pressure, and 3-lap trend ("rising +4/lap 🔴")
+
+The user makes their call, then sees the outcome reveal: what the team actually did, how positions evolved, the Driver Soul model's confidence at that moment, and IBM Granite's narrative.
 
 ### 🏁 Track Intel
 - Circuit profile (length, DRS zones, overtaking difficulty, track character)
-- Interactive circuit layout with live driver position dots (positions estimated from gap/lap_time arc-length math)
+- Interactive circuit layout with live driver position dots
 - Sector dominance heatmap (who is fastest in S1/S2/S3 vs. field average)
 - Grid → finish position analysis (scatter + season average positions gained)
 - 15-lap battle forecast (position projection heatmap with DRS range highlighted)
@@ -209,21 +224,22 @@ pitMind/
 │   ├── track_view.py        # Track Intel tab
 │   └── stats_view.py        # Driver Stats tab
 ├── agent/
-│   └── granite.py           # IBM Granite integration (8 AI functions, 565 lines)
+│   └── granite.py           # IBM Granite integration (8 AI functions)
 ├── models/
 │   ├── driver_soul.py       # 11-trait behavioral model + XGBoost + SHAP
 │   ├── momentum.py          # Momentum score formula + shift detection
+│   ├── race_forecast.py     # 15-lap projection + 4-scenario pit optimizer
 │   ├── sentiment.py         # Whisper transcription + TextBlob scoring
 │   ├── error_detection.py   # 5-type pilot error classifier
-│   ├── race_forecast.py     # 15-lap position projection
-│   └── driver_stats.py      # Season-level aggregations + H2H
+│   ├── driver_stats.py      # Season-level aggregations + H2H
+│   └── saved/               # Pre-trained driver_soul.joblib model
 ├── data/
-│   ├── ingest.py            # FastF1 + OpenF1 unified pipeline (22 KB)
+│   ├── ingest.py            # FastF1 + OpenF1 unified pipeline
 │   └── cache/               # Pre-computed .parquet + shift .json files
 ├── scripts/
-│   └── build_data.py        # Offline build orchestrator (ingest → sentiment → momentum → soul)
-├── requirements.txt
-└── packages.txt             # Streamlit Cloud system deps (ffmpeg)
+│   └── build_data.py        # Offline build orchestrator
+├── tests/                   # 36 pytest tests
+└── requirements.txt
 ```
 
 ---
@@ -231,25 +247,21 @@ pitMind/
 ## Running Locally
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/pitMind
+git clone https://github.com/aleksarriola-max/pitMind
 cd pitMind
 
-# Create virtual environment
 python -m venv venv
-source venv/bin/activate        # macOS/Linux
-venv\Scripts\activate           # Windows
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # macOS/Linux
 
 pip install -r requirements.txt
 
 # Configure IBM Watsonx credentials
-mkdir -p .streamlit
-cat > .streamlit/secrets.toml << 'EOF'
-WATSONX_API_KEY = "your-api-key"
-WATSONX_PROJECT_ID = "your-project-id"
-WATSONX_URL = "https://us-south.ml.cloud.ibm.com"
-EOF
+# Create .streamlit/secrets.toml with:
+# WATSONX_API_KEY = "your-api-key"
+# WATSONX_PROJECT_ID = "your-project-id"
+# WATSONX_URL = "https://us-south.ml.cloud.ibm.com"
 
-# Run the app (pre-computed data is already in data/cache/)
 streamlit run app/main.py
 ```
 
@@ -258,10 +270,10 @@ The app loads from pre-computed `.parquet` cache files — no data rebuild requi
 ### Rebuilding Race Data (optional)
 
 ```bash
-python scripts/build_data.py bahrain_2025 --skip-whisper
+python scripts/build_data.py --skip-whisper
 ```
 
-This pulls fresh data from FastF1 + OpenF1, computes momentum scores and behavioral traits, and saves updated cache files.
+Pulls fresh data from FastF1 + OpenF1, computes momentum scores and behavioral traits, and saves updated cache files. `--skip-whisper` skips Whisper transcription if not installed.
 
 ---
 
@@ -272,13 +284,7 @@ This pulls fresh data from FastF1 + OpenF1, computes momentum scores and behavio
 3. Navigate to [dataplatform.cloud.ibm.com](https://dataplatform.cloud.ibm.com) → Create a project
 4. IAM → Manage → API keys → Create API key
 5. Note your **project ID** (shown in the project URL)
-6. Add credentials to `.streamlit/secrets.toml` (see above)
-
----
-
-## Demo Video
-
-▶ [Watch the 3-minute walkthrough](https://pitmind-bvihgej8qmkzrergphk4xb.streamlit.app/)
+6. Add credentials to `.streamlit/secrets.toml`
 
 ---
 
@@ -293,9 +299,9 @@ This pulls fresh data from FastF1 + OpenF1, computes momentum scores and behavio
 | [XGBoost](https://xgboost.ai) | Multi-target behavioral predictions |
 | [SHAP](https://shap.readthedocs.io) | Per-lap feature importance |
 | [UMAP](https://umap-learn.readthedocs.io) | Driver behavioral fingerprinting |
-| [Whisper](https://github.com/openai/whisper) | Team radio audio transcription |
-| [TextBlob](https://textblob.readthedocs.io) | Sentiment scoring |
 | [Plotly](https://plotly.com) | Interactive charts |
+| [ruptures](https://centre-borelli.github.io/ruptures-docs/) | Momentum shift detection (PELT algorithm) |
+| [scipy](https://scipy.org) | Signal processing for error detection |
 
 ---
 

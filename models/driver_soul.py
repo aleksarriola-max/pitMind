@@ -319,10 +319,10 @@ def compute_incident_risk(df: pd.DataFrame) -> pd.Series:
 # ---------------------------------------------------------------------------
 
 def save_models(umap_model, predictor, shap_explainer, feature_names: list) -> str:
+    """Save runtime-only objects — UMAP excluded so umap-learn is not required at serving time."""
     os.makedirs(MODELS_DIR, exist_ok=True)
     path = os.path.join(MODELS_DIR, "driver_soul.joblib")
     joblib.dump({
-        "umap": umap_model,
         "predictor": predictor,
         "shap_explainer": shap_explainer,
         "feature_names": feature_names,

@@ -9,5 +9,3 @@ xgboost
 shap
 scikit-learn
 joblib
-ruptures
-umap-learn

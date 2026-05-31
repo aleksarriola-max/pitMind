@@ -59,6 +59,8 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
         st.info("Not enough race data to compute season statistics.")
         return
 
+    # Filter to current DRIVERS list so stale parquet entries don't appear
+    stats_df = stats_df[stats_df.index.isin(DRIVERS)]
     stats_df = rank_drivers(stats_df)
     mode_label = "Fan" if mode == "fan" else "Engineer"
 

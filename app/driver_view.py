@@ -124,6 +124,15 @@ def _shap_bars(shap_vals: dict):
     return fig
 
 
+@st.cache_resource(show_spinner=False)
+def _get_driver_models() -> dict:
+    from models.driver_soul import load_models
+    try:
+        return load_models()
+    except Exception:
+        return {}
+
+
 @st.cache_data(show_spinner=False)
 def _get_shap_for_lap(driver: str, lap: int, race_slug: str) -> dict:
     """Get SHAP values for a specific driver+lap from saved model."""
@@ -216,8 +225,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
         st.divider()
         st.markdown("**Model Feature Importance — Position Gain Predictor**")
         try:
-            from models.driver_soul import load_models
-            _models = load_models()
+            _models = _get_driver_models()
             _predictor = _models.get("predictor")
             _feat_names = _models.get("feature_names", [])
             if _predictor is not None and hasattr(_predictor, "estimators_") and _feat_names:

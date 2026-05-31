@@ -8,6 +8,16 @@ import streamlit as st
 
 from models.race_forecast import forecast_positions, get_aggression_zone_stats
 
+
+@st.cache_data(show_spinner=False)
+def _get_forecast(df: pd.DataFrame, lap: int, n_laps: int):
+    return forecast_positions(df, lap, n_laps)
+
+
+@st.cache_data(show_spinner=False)
+def _get_agg_stats(df: pd.DataFrame):
+    return get_aggression_zone_stats(df)
+
 try:
     from agent.granite import track_intel_brief, error_summary
 except ImportError:
@@ -90,10 +100,9 @@ DRIVER_NUMBERS = {
 _track_session_key_cache: dict = {}
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def _get_session_key_for_slug(race_slug: str) -> int | None:
     """Resolve OpenF1 session_key for a race slug via the /sessions endpoint."""
-    if race_slug in _track_session_key_cache:
-        return _track_session_key_cache[race_slug]
 
     # Map slug to year + circuit short name using the same RACES dict structure
     _SLUG_META = {
@@ -127,7 +136,6 @@ def _get_session_key_for_slug(race_slug: str) -> int | None:
             if circuit in key_name or key_name in circuit:
                 sk = s.get("session_key")
                 if sk:
-                    _track_session_key_cache[race_slug] = int(sk)
                     return int(sk)
     except Exception:
         pass
@@ -685,7 +693,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     st.divider()
     st.subheader("Where in the Race Do Position Battles Happen?")
 
-    agg_stats = get_aggression_zone_stats(df)
+    agg_stats = _get_agg_stats(df)
     if len(agg_stats) > 0:
         fig_agg = go.Figure()
         zone_colors = {"Early": "#E10600", "Mid": "#FF8000", "Late": "#27F4D2"}
@@ -720,7 +728,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
             return
 
         n_laps = 15
-        proj_df, aggression_windows = forecast_positions(df, lap, n_laps)
+        proj_df, aggression_windows = _get_forecast(df, lap, n_laps)
 
         if len(proj_df) == 0:
             st.info("Not enough data for battle forecast at this lap.")

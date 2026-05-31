@@ -17,6 +17,11 @@ def _get_pitwall_brief(lap_data_json: str, mode: str) -> str:
     return pitwall_brief(json.loads(lap_data_json), mode)
 
 
+@st.cache_data(show_spinner=False)
+def _get_pit_scenarios(df: pd.DataFrame, race_slug: str, lap: int, driver: str, n_laps: int) -> list:
+    return compare_pit_scenarios(df, race_slug, lap, driver, n_laps)
+
+
 def _simulate_outcome(df: pd.DataFrame, driver: str, decision_lap: int, choice: str) -> dict:
     """
     Fast-forward the race from decision_lap and compute the outcome difference
@@ -179,7 +184,7 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
         st.markdown("**Pit Strategy Optimizer — Scenario Analysis**")
         try:
             _race_slug = st.session_state.get("selected_race", "bahrain_2025")
-            _scenarios = compare_pit_scenarios(df, _race_slug, lap, driver, n_laps=15)
+            _scenarios = _get_pit_scenarios(df, _race_slug, lap, driver, n_laps=15)
         except Exception:
             _scenarios = []
 

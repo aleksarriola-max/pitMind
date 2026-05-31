@@ -403,10 +403,10 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
     if st.session_state.get("pit_decision") is None:
         st.markdown("### Your call")
         col_pit, col_stay = st.columns(2)
-        if col_pit.button("🔧 Pit Now", width='stretch', type="primary"):
+        if col_pit.button("🔧 Pit Now", use_container_width=True, type="primary"):
             st.session_state.pit_decision = "pit"
             st.rerun()
-        if col_stay.button("🏎 Stay Out", width='stretch'):
+        if col_stay.button("🏎 Stay Out", use_container_width=True):
             st.session_state.pit_decision = "stay"
             st.rerun()
     else:

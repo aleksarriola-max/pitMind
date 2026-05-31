@@ -332,7 +332,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
                     pred_drivers = [d for d in DRIVERS if d in df["driver"].unique()][:4]
                     pred_cols = st.columns(len(pred_drivers))
                     for col, drv in zip(pred_cols, pred_drivers):
-                        if col.button(drv, key=f"pred_btn_{drv}_{current_lap}", width='stretch'):
+                        if col.button(drv, key=f"pred_btn_{drv}_{current_lap}", use_container_width=True):
                             st.session_state[pred_key] = drv
                             st.rerun()
                 else:

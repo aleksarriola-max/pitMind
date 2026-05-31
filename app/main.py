@@ -236,5 +236,5 @@ with tab_track:
 
 with tab_stats:
     from app.stats_view import render_driver_stats
-    all_race_dfs_stats = {slug: get_race_df(slug) for slug in RACES}
+    all_race_dfs_stats = all_race_dfs
     render_driver_stats(all_race_dfs_stats, st.session_state.selected_driver, st.session_state.mode)

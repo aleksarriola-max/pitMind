@@ -162,7 +162,7 @@
 
 > "PitMind. F1 intelligence for everyone."
 
-> "Live at pitmind-bvihgej8qmkzrergphk4xb.streamlit.app"
+> "Live at pitmind-de6surgjaau5yewdynmxdp.streamlit.app"
 
 ---
 

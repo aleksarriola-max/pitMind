@@ -2,7 +2,7 @@
 
 > Bridging the gap between the pit wall and the grandstand — powered by IBM Granite AI
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B)](https://pitmind-bvihgej8qmkzrergphk4xb.streamlit.app/?race=bahrain_2025&driver=VER&lap=1)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B)](https://pitmind-de6surgjaau5yewdynmxdp.streamlit.app/?race=bahrain_2025&driver=VER&lap=1)
 [![IBM Granite](https://img.shields.io/badge/IBM-Granite%204-0043CE)](https://www.ibm.com/watsonx)
 [![Built with Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B)](https://streamlit.io)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://python.org)

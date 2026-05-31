@@ -93,7 +93,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                 lambda x: f"{x:.1f}" if pd.notna(x) else "—"
             )
 
-        st.dataframe(leaderboard, use_container_width=True, height=320, hide_index=True)
+        st.dataframe(leaderboard, width='stretch', height=320, hide_index=True)
 
     st.divider()
 
@@ -145,7 +145,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
             height=380,
             margin=dict(l=50, r=50, t=20, b=20),
         )
-        st.plotly_chart(fig_radar, use_container_width=True)
+        st.plotly_chart(fig_radar, width='stretch')
 
         # Granite H2H narrative
         stats_a = {k: stats_df.loc[driver_a, k] for k in LEADERBOARD_METRICS if k in stats_df.columns and driver_a in stats_df.index}
@@ -173,7 +173,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
                     winner = driver_a if va > vb else driver_b
                 rows.append({"Metric": label, driver_a: f"{float(va):.1f}", driver_b: f"{float(vb):.1f}", "Edge": winner})
             if rows:
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
     st.divider()
 
@@ -230,7 +230,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
         )
         with col:
             st.caption(metric_labels.get(metric, metric))
-            st.plotly_chart(fig_arc, use_container_width=True)
+            st.plotly_chart(fig_arc, width='stretch')
 
     # ── Section 4: Intra-Team Comparison ──────────────────────────────────────
     if mode == "engineer":
@@ -284,7 +284,7 @@ def render_driver_stats(all_race_dfs: dict, selected_driver: str, mode: str):
 
                 if rows:
                     team_df = pd.DataFrame(rows)
-                    st.dataframe(team_df, use_container_width=True, hide_index=True)
+                    st.dataframe(team_df, width='stretch', hide_index=True)
 
                     # Win count summary
                     wins_a = sum(1 for r in rows if r["Edge"].startswith(drv_a))

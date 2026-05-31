@@ -501,7 +501,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
     fig_circuit = _render_circuit_map(race_slug, lap_df=lap_df, overtake_events=overtake_events)
     if fig_circuit:
         st.subheader("Circuit Layout")
-        st.plotly_chart(fig_circuit, use_container_width=True)
+        st.plotly_chart(fig_circuit, width='stretch')
 
     if mode == "engineer":
         st.divider()
@@ -535,7 +535,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                 xaxis=dict(title="Sector", side="bottom"),
                 yaxis=dict(title="Driver", autorange="reversed"),
             )
-            st.plotly_chart(fig_heat, use_container_width=True)
+            st.plotly_chart(fig_heat, width='stretch')
         else:
             st.info("Sector time data not available for this race.")
 
@@ -611,7 +611,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                         x0=sc_lap - 0.5, x1=sc_lap + 0.5,
                         fillcolor="rgba(200,200,200,0.1)", line_width=0,
                     )
-            st.plotly_chart(fig_sec, use_container_width=True)
+            st.plotly_chart(fig_sec, width='stretch')
             st.caption("Solid = S1 · Dashed = S2 · Dotted = S3 · Faint = raw · Bold = 3-lap avg · Grey bands = SC")
         elif drv_a == drv_b:
             st.info("Select two different drivers to compare sector times.")
@@ -654,7 +654,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                         height=280,
                         margin=dict(l=50, r=20, t=10, b=50),
                     )
-                    st.plotly_chart(fig_scatter, use_container_width=True)
+                    st.plotly_chart(fig_scatter, width='stretch')
             with col_right:
                 st.caption("Season average — positions gained from grid")
                 avg_gained = gf_df.groupby("driver")["gained"].mean().reset_index()
@@ -677,7 +677,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
                     height=280,
                     margin=dict(l=60, r=60, t=10, b=50),
                 )
-                st.plotly_chart(fig_bar, use_container_width=True)
+                st.plotly_chart(fig_bar, width='stretch')
         else:
             st.info("Grid position data not available.")
 
@@ -707,7 +707,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
             margin=dict(l=50, r=20, t=10, b=40),
             legend=dict(orientation="h", yanchor="bottom", y=1.01),
         )
-        st.plotly_chart(fig_agg, use_container_width=True)
+        st.plotly_chart(fig_agg, width='stretch')
 
     if mode == "engineer":
         st.divider()
@@ -760,7 +760,7 @@ def render_track_intel(df: pd.DataFrame, race_slug: str, all_race_dfs: dict, dri
             margin=dict(l=50, r=20, t=20, b=40),
             legend=dict(orientation="h", yanchor="bottom", y=1.01),
         )
-        st.plotly_chart(fig_traj, use_container_width=True)
+        st.plotly_chart(fig_traj, width='stretch')
 
         # Aggression windows table
         if aggression_windows:

@@ -202,7 +202,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
         margin=dict(l=40, r=20, t=20, b=40),
         height=420, hovermode="x unified",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # Flag legend
     if flag_periods:
@@ -242,7 +242,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
                 showlegend=False,
             )
             st.caption("DRS usage per lap")
-            st.plotly_chart(fig_drs, use_container_width=True)
+            st.plotly_chart(fig_drs, width='stretch')
 
     st.divider()
 
@@ -299,7 +299,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
                                 "Δ": f"{delta:+.2f}",
                             })
                         if sig_rows:
-                            st.dataframe(pd.DataFrame(sig_rows), hide_index=True, use_container_width=True)
+                            st.dataframe(pd.DataFrame(sig_rows), hide_index=True, width='stretch')
         else:
             st.info("No significant momentum shifts detected for the selected drivers.")
 
@@ -332,7 +332,7 @@ def render_momentum(df: pd.DataFrame, shifts: list, highlight_driver: str, mode:
                     pred_drivers = [d for d in DRIVERS if d in df["driver"].unique()][:4]
                     pred_cols = st.columns(len(pred_drivers))
                     for col, drv in zip(pred_cols, pred_drivers):
-                        if col.button(drv, key=f"pred_btn_{drv}_{current_lap}", use_container_width=True):
+                        if col.button(drv, key=f"pred_btn_{drv}_{current_lap}", width='stretch'):
                             st.session_state[pred_key] = drv
                             st.rerun()
                 else:

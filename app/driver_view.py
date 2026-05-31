@@ -172,7 +172,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
         st.markdown("**Behavioral Fingerprint** (season average)")
         fingerprint = get_driver_fingerprint(df, driver)
         fig = _radar_chart(fingerprint, driver)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     with col_right:
         st.markdown(f"**Live State at Lap {lap}**")
@@ -195,10 +195,10 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
     st.markdown(f"**Race Outcome Predictions at Lap {lap}**")
     if lap_state:
         fig_pred = _prediction_bars(lap_state)
-        st.plotly_chart(fig_pred, use_container_width=True)
+        st.plotly_chart(fig_pred, width='stretch')
         if mode == "engineer":
             pred_rows = [{"Outcome": PRED_LABELS.get(c, c), "Probability": f"{lap_state.get(c, 0):.1%}"} for c in PRED_COLS]
-            st.dataframe(pd.DataFrame(pred_rows), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(pred_rows), hide_index=True, width='stretch')
 
     # SHAP (engineer only)
     st.divider()
@@ -208,7 +208,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
         if shap_vals:
             fig_shap = _shap_bars(shap_vals)
             if fig_shap:
-                st.plotly_chart(fig_shap, use_container_width=True)
+                st.plotly_chart(fig_shap, width='stretch')
         else:
             st.caption("SHAP values unavailable for this lap.")
 
@@ -242,7 +242,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
                     height=280,
                     margin=dict(l=160, r=60, t=10, b=40),
                 )
-                st.plotly_chart(_fig_imp, use_container_width=True)
+                st.plotly_chart(_fig_imp, width='stretch')
                 st.caption("Global XGBoost feature importances for the position gain prediction model")
             else:
                 st.caption("Feature importance unavailable.")
@@ -274,7 +274,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 height=200, margin=dict(l=60, r=20, t=10, b=40),
                 showlegend=False,
             )
-            st.plotly_chart(fig_sent, use_container_width=True)
+            st.plotly_chart(fig_sent, width='stretch')
         else:
             st.caption("Radio sentiment data unavailable.")
 
@@ -299,7 +299,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 height=200, margin=dict(l=60, r=20, t=10, b=40),
                 showlegend=False,
             )
-            st.plotly_chart(fig_risk, use_container_width=True)
+            st.plotly_chart(fig_risk, width='stretch')
         else:
             st.caption("Incident risk data unavailable.")
 
@@ -326,7 +326,7 @@ def render_driver_soul(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 legend=dict(orientation="h", yanchor="bottom", y=1.01),
                 height=220, margin=dict(l=60, r=20, t=20, b=40),
             )
-            st.plotly_chart(fig_trend, use_container_width=True)
+            st.plotly_chart(fig_trend, width='stretch')
         else:
             st.caption("Prediction trend data unavailable.")
 

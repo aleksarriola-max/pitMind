@@ -11,7 +11,6 @@ import logging
 import requests
 import numpy as np
 import pandas as pd
-import fastf1
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -19,6 +18,13 @@ log = logging.getLogger(__name__)
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 FASTF1_CACHE_DIR = os.path.join(CACHE_DIR, "fastf1")
 OPENF1_BASE = "https://api.openf1.org/v1"
+
+def _get_fastf1():
+    """Lazy-load FastF1 — only needed for data ingestion, not for the live app."""
+    import fastf1  # noqa: PLC0415
+    os.makedirs(FASTF1_CACHE_DIR, exist_ok=True)
+    fastf1.Cache.enable_cache(FASTF1_CACHE_DIR)
+    return fastf1
 
 RACES = {
     "bahrain_2025":     {"year": 2025, "round": 4,  "name": "Bahrain 2025",   "openf1_circuit": "bahrain"},
@@ -30,8 +36,6 @@ RACES = {
 
 DRIVERS = ["VER", "HAM", "LEC", "PIA", "ALO", "OCO", "NOR", "RUS"]
 
-os.makedirs(FASTF1_CACHE_DIR, exist_ok=True)
-fastf1.Cache.enable_cache(FASTF1_CACHE_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +45,8 @@ fastf1.Cache.enable_cache(FASTF1_CACHE_DIR)
 def pull_fastf1(year: int, round_num: int) -> dict:
     """Pull lap times, telemetry, tyre data, sector splits from FastF1."""
     log.info(f"Loading FastF1 session {year} round {round_num}")
-    session = fastf1.get_session(year, round_num, "R")
+    ff1 = _get_fastf1()
+    session = ff1.get_session(year, round_num, "R")
     session.load(telemetry=True, weather=True, messages=True)
 
     laps = session.laps.copy()
@@ -127,7 +132,7 @@ def pull_fastf1(year: int, round_num: int) -> dict:
 def pull_qualifying(year: int, round_num: int) -> dict:
     """Pull qualifying results and return {driver_code: grid_position} mapping."""
     try:
-        session = fastf1.get_session(year, round_num, "Q")
+        session = _get_fastf1().get_session(year, round_num, "Q")
         session.load(telemetry=False, weather=False, messages=False)
         laps = session.laps.copy()
         laps = laps[laps["Driver"].isin(DRIVERS) & laps["LapTime"].notna()]

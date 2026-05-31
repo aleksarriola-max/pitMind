@@ -5,9 +5,9 @@ numpy
 pyarrow
 requests
 scipy
-fastf1>=3.3
 xgboost
 shap
 scikit-learn
 joblib
 ruptures
+umap-learn

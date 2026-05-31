@@ -239,7 +239,7 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                     height=260, margin=dict(l=50, r=20, t=20, b=40),
                     legend=dict(orientation="h", yanchor="bottom", y=1.01),
                 )
-                st.plotly_chart(_fig_traj, use_container_width=True)
+                st.plotly_chart(_fig_traj, width='stretch')
 
         # Competitor Threat Analysis — engineer mode only
         st.markdown("**Competitor Threat Analysis**")
@@ -403,10 +403,10 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
     if st.session_state.get("pit_decision") is None:
         st.markdown("### Your call")
         col_pit, col_stay = st.columns(2)
-        if col_pit.button("🔧 Pit Now", use_container_width=True, type="primary"):
+        if col_pit.button("🔧 Pit Now", width='stretch', type="primary"):
             st.session_state.pit_decision = "pit"
             st.rerun()
-        if col_stay.button("🏎 Stay Out", use_container_width=True):
+        if col_stay.button("🏎 Stay Out", width='stretch'):
             st.session_state.pit_decision = "stay"
             st.rerun()
     else:
@@ -422,7 +422,7 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                 outcome["momentum_after"],
                 lap, driver,
             ),
-            use_container_width=True,
+            width='stretch',
         )
 
         # Outcome text
@@ -465,7 +465,7 @@ def render_pitwall(df: pd.DataFrame, driver: str, lap: int, mode: str):
                     height=200, margin=dict(l=60, r=20, t=10, b=40),
                     showlegend=False,
                 )
-                st.plotly_chart(fig_pw, use_container_width=True)
+                st.plotly_chart(fig_pw, width='stretch')
 
         # Driver Soul instinct card
         st.divider()

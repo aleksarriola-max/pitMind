@@ -100,7 +100,7 @@
 
 ---
 
-### [1:30 – 1:55] DRIVER SOUL
+### [1:55 – 2:15] DRIVER SOUL
 
 **Screen:** Switch to Driver Soul tab, NOR, Monaco 2025, lap 30.
 

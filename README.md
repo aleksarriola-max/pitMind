@@ -37,7 +37,7 @@ The app has two modes toggled by a single switch:
 
 Both modes are powered by **IBM Granite AI** generating contextual narratives matched to the audience — same model, same data, radically different output.
 
-**2025 drivers covered:** VER · HAM · LEC · PIA · ALO · OCO · NOR · RUS — the real top 8 from the 2025 season, including championship winner Norris and runner-up Piastri.
+**2025 drivers covered:** VER · HAM · LEC · PIA · ALO · OCO · NOR · RUS — eight drivers from the 2025 season, including champion Norris, runner-up Verstappen and third-placed Piastri.
 
 ---
 

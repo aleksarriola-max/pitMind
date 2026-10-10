@@ -189,10 +189,16 @@ def engineer_traits(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def _build_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Add binary target columns derived from future position changes."""
-    df = df.copy().sort_values(["driver", "lap"]).reset_index(drop=True)
+    """Add binary target columns derived from future position changes.
 
-    for driver, grp in df.groupby("driver"):
+    Labels look ahead within the same race only: when several races are
+    combined, laps are grouped by (race, driver) so a driver's last laps in one
+    race are never compared with their first laps in the next.
+    """
+    keys = ["race_slug", "driver"] if "race_slug" in df.columns else ["driver"]
+    df = df.copy().sort_values(keys + ["lap"]).reset_index(drop=True)
+
+    for _, grp in df.groupby(keys):
         idx = grp.index
         pos = grp["position"].values
         is_pit = grp["is_pit_in"].values
@@ -343,13 +349,17 @@ def load_models() -> dict:
 # ---------------------------------------------------------------------------
 
 def _compute_validation_metrics(df: pd.DataFrame, predictor, feature_names: list) -> dict:
-    """Chronological 80/20 split validation. Logs accuracy/precision/recall per target.
+    """Held-out validation: train on all races but one, score the held-out race.
 
-    First N-1 races = train set, last race = validation set.
+    A separate model is fitted on the training races only, so the validation
+    race is never seen during training. (The `predictor` argument is the
+    production model trained on every race; it is not used for scoring because
+    that would measure in-sample fit.) Reports accuracy, precision, recall,
+    ROC AUC and the majority-class baseline per target.
     Metrics are build-time only — logged to console, saved to models/saved/soul_metrics.json.
     Returns empty dict if insufficient data.
     """
-    from sklearn.metrics import accuracy_score, precision_score, recall_score
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
 
     if "race_slug" not in df.columns:
         log.warning("race_slug column missing — skipping validation metrics")
@@ -365,6 +375,12 @@ def _compute_validation_metrics(df: pd.DataFrame, predictor, feature_names: list
 
     train_df = df[df["race_slug"].isin(train_slugs)]
     val_df   = df[df["race_slug"] == val_slug]
+
+    # Fit a validation-only model on the training races (never on val_slug)
+    predictor, _ = fit_predictor(train_df)
+    if predictor is None:
+        log.warning("Not enough training rows outside the validation race — skipping metrics")
+        return {}
 
     available_features = [c for c in feature_names if c in val_df.columns]
     target_cols  = ["_target_gain", "_target_loss", "_target_pit"]
@@ -384,8 +400,13 @@ def _compute_validation_metrics(df: pd.DataFrame, predictor, feature_names: list
         for i, name in enumerate(target_names):
             y_pred = (proba[i][:, 1] >= 0.5).astype(int)
             y_true = y_val[:, i].astype(int)
+            base = float(max(y_true.mean(), 1 - y_true.mean()))
+            auc = (round(float(roc_auc_score(y_true, proba[i][:, 1])), 4)
+                   if len(set(y_true)) > 1 else None)
             metrics[name] = {
                 "accuracy":       round(float(accuracy_score(y_true, y_pred)), 4),
+                "majority_baseline": round(base, 4),
+                "roc_auc":        auc,
                 "precision":      round(float(precision_score(y_true, y_pred, zero_division=0)), 4),
                 "recall":         round(float(recall_score(y_true, y_pred, zero_division=0)), 4),
                 "n_val_samples":  int(len(y_true)),

@@ -46,7 +46,7 @@ def _gap_trajectory(df: pd.DataFrame) -> pd.Series:
 def add_momentum(df: pd.DataFrame) -> pd.DataFrame:
     """Add momentum_score column (0–100) to the per-lap DataFrame.
 
-    Weight rationale (empirical, from lap-level correlation analysis):
+    Weight rationale (set by design judgment; not fitted, see README 'Model limitations'):
       pace_delta (40%): Strongest single predictor of short-term position change.
         Pace advantage/disadvantage compounds over consecutive laps.
       gap_trajectory (30%): Leading indicator — a closing gap predicts overtake

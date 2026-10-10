@@ -91,3 +91,45 @@ def test_validation_metrics_returns_empty_with_single_race(lap_df):
     df["race_slug"] = "bahrain_2025"
     metrics = _compute_validation_metrics(df, None, [])
     assert metrics == {}
+
+
+# ---------------------------------------------------------------------------
+# _build_labels — labels must not look across race boundaries
+# ---------------------------------------------------------------------------
+
+def test_labels_do_not_cross_races():
+    """A driver's last lap in race A must not be labeled from race B's laps."""
+    from models.driver_soul import _build_labels
+    rows = []
+    # Race A: driver holds P5 on laps 1-3 (no change ahead)
+    for lap in (1, 2, 3):
+        rows.append({"race_slug": "a", "driver": "VER", "lap": lap, "position": 5, "is_pit_in": False})
+    # Race B: same driver starts P1 on laps 1-3
+    for lap in (1, 2, 3):
+        rows.append({"race_slug": "b", "driver": "VER", "lap": lap, "position": 1, "is_pit_in": False})
+    out = _build_labels(pd.DataFrame(rows))
+    race_a = out[out["race_slug"] == "a"]
+    # Without the fix, race A laps would 'see' race B's P1 and get gain=1
+    assert race_a["_target_gain"].sum() == 0
+    assert race_a["_target_loss"].sum() == 0
+
+
+def test_validation_holds_out_last_race():
+    """Validation must report a race that is not among the training races."""
+    rng = np.random.default_rng(0)
+    rows = []
+    for slug in ("r1", "r2", "r3"):
+        for drv in ("AAA", "BBB", "CCC", "DDD"):
+            for lap in range(1, 31):
+                rows.append({"race_slug": slug, "driver": drv, "lap": lap,
+                             "tyre_age": lap % 20, "gap_ahead": rng.random(), "gap_behind": rng.random(),
+                             "pit_window_pressure": rng.random() * 100, "lap_time": 90 + rng.random(),
+                             "_target_gain": int(rng.random() > .5), "_target_loss": int(rng.random() > .5),
+                             "_target_pit": int(rng.random() > .8)})
+    df = pd.DataFrame(rows)
+    feats = ["tyre_age", "gap_ahead", "gap_behind", "pit_window_pressure", "lap_time"]
+    metrics = _compute_validation_metrics(df, predictor=None, feature_names=feats)
+    assert metrics, "expected metrics"
+    for m in metrics.values():
+        assert m["val_race"] not in m["train_races"]
+        assert "majority_baseline" in m and "roc_auc" in m

@@ -6,6 +6,13 @@
 [![IBM Granite](https://img.shields.io/badge/IBM-Granite%204-0043CE)](https://www.ibm.com/watsonx)
 [![Built with Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B)](https://streamlit.io)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://python.org)
+[![Award](https://img.shields.io/badge/🏅%20Most%20Innovative-IBM%20SkillsBuild%20AI%20Builders-c9a84c)](#)
+[![Tests](https://img.shields.io/badge/tests-38%20passing-2ea44f)](tests/)
+
+<p align="center">
+  <img src="docs/pitmind-demo.gif" width="760" alt="PitMind tour: Momentum Map, Pit Wall Mirror, Driver Soul and Track Intel for Bahrain 2025"/>
+  <br><sub>Momentum Map → Pit Wall Mirror → Driver Soul → Track Intel (Bahrain 2025, Verstappen)</sub>
+</p>
 
 ---
 
